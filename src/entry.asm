@@ -1,5 +1,10 @@
 USE64
-ORG 0x100000
+;ORG 0x100000
+
+[EXTERN main]
+[GLOBAL clear_screen]
+[GLOBAL print_to_console]
+[GLOBAL start]
 
 start:
     call clear_screen
@@ -8,6 +13,7 @@ say_hi:
     call print_to_console
     mov rdi, hello_message
     call print_to_console
+    call main
 done:
     jmp $
 

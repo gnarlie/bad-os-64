@@ -2,3 +2,4 @@ bochsout.txt
 disk.img
 entry.sys
 kernel.sys
+out/
