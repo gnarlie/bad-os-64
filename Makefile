@@ -11,7 +11,7 @@ out/%.o: src/%.c
 out/%.o: src/%.asm
 	nasm $< -felf64 -o $@
 
-kernel.sys: out/entry.o out/main.o
+kernel.sys: out/entry.o out/main.o out/console.o
 	ld -Tsrc/kernel.ld -melf_x86_64 -o /tmp/kernel $^
 	cat bootloader/pure64.sys /tmp/kernel > kernel.sys
 

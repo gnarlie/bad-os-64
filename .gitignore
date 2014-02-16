@@ -3,3 +3,4 @@ disk.img
 entry.sys
 kernel.sys
 out/
+core
