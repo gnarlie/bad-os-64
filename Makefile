@@ -16,7 +16,7 @@ kernel.sys: out/entry.o out/main.o out/console.o
 	cat bootloader/pure64.sys /tmp/kernel > kernel.sys
 
 disk.img: kernel.sys
-	sudo ./createimage.sh disk.img 1 bootloader/bmfs_mbr.sys kernel.sys
+	./createimage.sh disk.img 1 bootloader/bmfs_mbr.sys kernel.sys
 
 clean:
 	rm -f disk.img entry.sys kernel.sys out/*
