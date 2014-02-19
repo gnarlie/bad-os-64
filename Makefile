@@ -10,6 +10,7 @@ out/%.o: src/%.c
 	$(CC) -c $(CFLAGS) -o $@ $^
 
 out/%.o: src/%.asm
+	@mkdir -p out/
 	nasm $< -felf64 -o $@
 
 kernel.sys: out/entry.o out/main.o out/console.o out/keyboard.o

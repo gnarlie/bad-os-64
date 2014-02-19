@@ -78,7 +78,7 @@ void keyboard_irq() {
         case(0xfc):
         case(0xfd):
         case(0xfe):
-        case(0xff): warning("keyboard error");
+        case(0xff): console_print_string("keyboard error"); // TODO... stay off console by default
             break;
         case(0x1d): //left
             control = dir;
