@@ -1,5 +1,6 @@
 #include "common.h"
 #include "console.h"
+#include "keyboard.h"
 
 #define IRQ0 32
 #define IRQ1 33
@@ -79,49 +80,13 @@ void breakpoint() {
     console_print_string("breakpoint!\n");
 }
 
-char scancode[] = "\000\0001234567890-=\b"
-                  "\tqwertyuiop[]\n"
-                  "\000asdfghjkl;'`"
-                  "\000\\zxcvbnm,./\000"
-                  "*\000 \000FFFFFFFFFF\000\000"
-                  "7894561230."
-                  "\000\000\000FF\000\000\000";
-char scancodeCap[] =  "\000\000!@#$%^&*()_+\b"
-                      "\tQWERTYUIOP{}\n"
-                      "\000ASDFGHJKL:\"~"
-                      "\000|ZXCVBNM<>?\000"
-                      "*\000 \000FFFFFFFFFF\000\000"
-                      "7894561230."
-                      "\000\000\000FF\000\000\000";
-
-static uint8_t shift = 0;
-void keyboard_irq() {
-    uint8_t u = inb(0x60);
-    switch(u) {
-        case(0x2a): //left shift
-        case(0x36): //right shift
-            shift = !shift;
-            break;
-        default: {
-            if (u < sizeof(scancode)) {
-                char k = shift ? scancodeCap[u] : scancode[u];
-                if (k) console_put(k);
-            }
-        }
-    }
-}
-
-void init_keyboard() {
-    register_interrupt_handler(IRQ1, keyboard_irq);
-}
 
 void main() {
     console_print_string("Hello from C\n");
     init_interrupts();
 
-    init_keyboard();
-
+    register_interrupt_handler(IRQ1, keyboard_irq);
     register_interrupt_handler(3, breakpoint);
-    asm volatile ("int $3");
+
     asm volatile ("int $3");
 }

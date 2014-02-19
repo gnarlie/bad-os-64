@@ -32,6 +32,12 @@ void console_put(char c) {
             ptrdiff_t dist = current - VideoStart;
             current = VideoStart + (dist / cols) * cols;
             break;
+        case('\b'):
+            current -= 2;
+            *current = ' ';
+            if (current < VideoStart)
+                current = VideoStart;
+            break;
         default:
             *current = c;
             current += 2;
