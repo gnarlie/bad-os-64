@@ -62,3 +62,18 @@ void console_print_string(const char * str) {
         console_put(*str++);
     }
 }
+
+static char hex(int i) {
+    if (i > 16) return '?';
+    if (i > 9) return 'A' + (i - 10);
+    else return '0' + i;
+}
+
+void console_put_hex(uint32_t v) {
+    console_put('0');
+    console_put('x');
+    for (int i = 28; i > 0; i -= 4) {
+        console_put(hex((v >> i) & 0xf ));
+        v = v << 4;
+    }
+}

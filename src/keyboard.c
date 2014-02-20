@@ -1,5 +1,6 @@
 #include "keyboard.h"
 #include "common.h"
+#include "console.h"
 
 char scancode[] = "\000\0331234567890-=\b"
                   "\tqwertyuiop[]\n"
@@ -26,14 +27,8 @@ static uint8_t capsEnabled = 0;
 static uint8_t numEnabled = 0;
 static uint8_t scrollEnabled = 0;
 
-static char hex(int i) {
-    if (i > 16) return '?';
-    if (i > 9) return 'A' + (i - 10);
-    else return '0' + i;
-}
-
 static void waitForKeyboard() {
-   while(inb(0x64) & 0x02) 
+   while(inb(0x64) & 0x02)
        ;
 }
 
@@ -74,12 +69,6 @@ void keyboard_irq() {
     uint8_t u = inb(0x60);
     KeyState dir = u & 0x80 ? UP : DOWN;
     switch(u & 0x7F) {
-        case(0x00):
-        case(0xfc):
-        case(0xfd):
-        case(0xfe):
-        case(0xff): console_print_string("keyboard error"); // TODO... stay off console by default
-            break;
         case(0x1d): //left
             control = dir;
             break;
@@ -110,6 +99,13 @@ void keyboard_irq() {
         case(0x2a): //left shift
         case(0x36): //right shift
             shift = dir;
+            break;
+        case(0x00):
+        case(0xfc):
+        case(0xfd):
+        case(0xfe):
+        case(0xff):
+            console_print_string("keyboard error"); // TODO... stay off console by default
             break;
         default: {
             if (u < sizeof(scancode)) {
