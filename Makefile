@@ -4,7 +4,7 @@ DISPLAY_LIBRARY ?= sdl
 C_FILES=$(shell find src -name '*.c')
 ASM_FILES=$(shell find src -name '*.asm')
 
-OBJS=$(patsubst src/%.c, out/%.o, $(C_FILES)) $(patsubst src/%.asm, out/%.o, $(ASM_FILES))
+OBJS=$(patsubst src/%.asm, out/%.o, $(ASM_FILES)) $(patsubst src/%.c, out/%.o, $(C_FILES))
 
 default: kernel.sys
 
