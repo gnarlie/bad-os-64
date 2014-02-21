@@ -72,8 +72,32 @@ static char hex(int i) {
 void console_put_hex(uint32_t v) {
     console_put('0');
     console_put('x');
-    for (int i = 28; i > 0; i -= 4) {
+    for (int i = 28; i >= 0; i -= 4) {
         console_put(hex((v >> i) & 0xf ));
-        v = v << 4;
     }
+}
+
+void console_put_hex64(uint64_t v) {
+    console_put('0');
+    console_put('x');
+    for (int i = 60; i >= 0; i -= 4) {
+        console_put(hex((v >> i) & 0xf ));
+    }
+}
+
+void console_put_dec(uint32_t v) {
+    char str[11];
+    str[10] = 0;
+    if (!v) {
+        console_put('0');
+        return;
+    }
+
+    char * p = str + 9;
+    for(; v; p--) {
+        *p = v % 10 + '0';
+        v /= 10;
+    }
+
+    console_print_string(p + 1);
 }
