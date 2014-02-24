@@ -1,6 +1,7 @@
 #include "common.h"
 #include "console.h"
 #include "keyboard.h"
+#include "memory.h"
 
 #define IRQ0 32
 #define IRQ1 33
@@ -32,7 +33,7 @@ typedef struct registers {
 
 typedef void (*isr_t)(registers_t*);
 
-isr_t interrupt_handlers[256];
+static isr_t interrupt_handlers[256];
 
 // isr impl
 void register_interrupt_handler(uint8_t n, isr_t handler) {
@@ -64,9 +65,7 @@ extern void create_gate(int, void(*)());
 void init_interrupts() {
     //tell the pic to enable more interupts (Pure64 just did cascade, keyboard, and RTC)
     outb(0x21, 0xf8);
-//    console_put_hex(inb(0xa1));
 //    outb(0xa1, 0);
-//    console_put_hex(inb(0xa1));
 
 #define DO_IRQ(x,y)   extern void irq##x(); create_gate(y, irq##x);
     DO_IRQ(0, 32);
@@ -165,9 +164,16 @@ void main() {
     console_print_string("Hello from C\n");
     init_interrupts();
 
-    console_put_hex(0xdeadbeef);
-    console_put_dec(1337);
-    console_print_string("\n");
+    kmem_init();
+    kmem_add_block(0x200000, 1024*1024*1024, 0x400);
+
+    uint32_t videoBase = *(uint32_t*)0x5060;
+    console_print_string("LAPIC ");
+    console_put_hex64(videoBase);
+    console_print_string(". CPU Speed ");
+    uint16_t cpuSpeed = *(uint16_t*)0x5010;
+    console_put_dec(cpuSpeed);
+    console_print_string("MHz \n");
 
     register_interrupt_handler(IRQ1, keyboard_irq);
     register_interrupt_handler(3, breakpoint);

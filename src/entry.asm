@@ -10,7 +10,7 @@ USE64
 [GLOBAL start]
 [GLOBAL create_gate]
 [GLOBAL create_isr_handler]
-
+[GLOBAL halt]
 
 start:
     call console_clear_screen

@@ -4,3 +4,4 @@ entry.sys
 kernel.sys
 out/
 core
+bin/

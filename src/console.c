@@ -6,6 +6,8 @@ static char *current = (char*) 0xB8000;
 static const uint16_t lines = 25;
 static const uint16_t cols = 160; // in bytes, 80 columns
 
+typedef unsigned long ptrdiff_t;
+
 static void scroll() {
     char * p = VideoStart;
     int i;
