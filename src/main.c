@@ -2,6 +2,7 @@
 #include "console.h"
 #include "keyboard.h"
 #include "memory.h"
+#include "rtc.h"
 
 #define IRQ0 32
 #define IRQ1 33
@@ -58,8 +59,6 @@ void irq_handler(uint8_t intNo, registers_t * regs) {
     }
 }
 
-extern void irq1();
-extern void irq0();
 extern void create_gate(int, void(*)());
 
 void init_interrupts() {
@@ -156,8 +155,24 @@ void protection(registers_t* regs) {
 }
 
 void timer_irq(registers_t* regs) {
-    static int c = 0;
-    *(char*)(0xb8000) = 'A' + c++ % 26;
+    static uint32_t time;
+    uint32_t now = read_rtc();
+    if (time != now) {
+        time = now;
+
+        char * clock = (char*) 0xb8000 + 2 * (80 - 8);
+        uint32_t hr = time / 3600;
+        clock[0] = (hr / 10) + '0';
+        clock[2] = (hr % 10) + '0';
+        clock[4] = ':';
+        uint32_t min = time / 60 % 60;
+        clock[6] = (min / 10) + '0';
+        clock[8] = (min % 10) + '0';
+        clock[10] = ':';
+        uint32_t sec = time % 60;
+        clock[12] = (sec / 10) + '0';
+        clock[14] = (sec % 10) + '0';
+    }
 }
 
 void main() {
@@ -165,11 +180,13 @@ void main() {
     init_interrupts();
 
     kmem_init();
+    // need to make these less arbiratry, based on the
+    // actual memory map
     kmem_add_block(0x200000, 1024*1024*1024, 0x400);
 
-    uint32_t videoBase = *(uint32_t*)0x5060;
+    uint32_t lapicBase = *(uint32_t*)0x5060;
     console_print_string("LAPIC ");
-    console_put_hex64(videoBase);
+    console_put_hex64(lapicBase);
     console_print_string(". CPU Speed ");
     uint16_t cpuSpeed = *(uint16_t*)0x5010;
     console_put_dec(cpuSpeed);
