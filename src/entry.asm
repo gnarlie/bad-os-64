@@ -13,11 +13,11 @@ USE64
 
 
 start:
-    sti
     call console_clear_screen
     mov rdi, hello_message
     call console_print_string
     call main
+    sti
 done:
 ;    inc byte [count]
 ;    mov ax,[count]
@@ -112,8 +112,8 @@ ret
 
 isr_common:
    call isr_handler
-   sti
    POP_ALL
+   sti
    iretq
 
 %macro IRQ 2
@@ -134,8 +134,8 @@ irq_common:
 reset_master:
    out 0x20, al ; reset master
    call irq_handler
-   sti
    POP_ALL
+   sti
    iretq
 
 IRQ 0, 32
