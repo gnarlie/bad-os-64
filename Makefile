@@ -17,6 +17,7 @@ test: bin/alltests
 .PHONY : test
 
 bin/alltests: $(TEST_OBJS) | $(filter-out out/entry.o out/panic.o out/main.o out/interrupt.o, $(OBJS))
+	-mkdir -p bin/
 	$(CC) -o $@ $^ $|
 
 run: disk.img
