@@ -1,10 +1,6 @@
 #include "memory.h"
 #include "tinytest.h"
 
-void panic(const char * why) {
-    ASSERT(why, 0);
-}
-
 void simpleAllocation() {
     void * block = malloc(1024*1024);
     kmem_add_block((uint64_t)block, 1024*1024, 0x100);
@@ -27,7 +23,3 @@ void simpleAllocation() {
 }
 
 
-int main(int argc, char**argv) {
-    RUN(simpleAllocation);
-    return TEST_REPORT();
-}

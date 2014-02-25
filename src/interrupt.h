@@ -34,3 +34,6 @@ typedef void (*isr_t)(registers_t*);
 
 void init_interrupts();
 void register_interrupt_handler(uint8_t interrupt, isr_t);
+
+void disable_interrupts();
+void enable_interrupts();

@@ -56,7 +56,7 @@
 #define ASSERT_STRING_EQUALS(expected, actual) ASSERT((#actual), strcmp((expected),(actual)) == 0)
 
 /* Run a test() function */
-#define RUN(test_function) tt_execute((#test_function), (test_function))
+#define RUN(test_function) extern void test_function(); tt_execute((#test_function), (test_function));
 #define TEST_REPORT() tt_report()
 
 #define TT_COLOR_CODE 0x1B
@@ -64,15 +64,15 @@
 #define TT_COLOR_GREEN "[1;32m"
 #define TT_COLOR_RESET "[0m"
 
-int tt_passes = 0;
-int tt_fails = 0;
-bool tt_current_test_failed = false;
-const char* tt_current_msg = NULL;
-const char* tt_current_expression = NULL;
-const char* tt_current_file = NULL;
-int tt_current_line = 0;
+int tt_passes __attribute__ ((weak));
+int tt_fails __attribute__ ((weak));
+bool tt_current_test_failed __attribute__ ((weak));
+const char* tt_current_msg __attribute__ ((weak));
+const char* tt_current_expression __attribute__ ((weak));
+const char* tt_current_file __attribute__ ((weak));
+int tt_current_line __attribute__ ((weak));
 
-void tt_execute(const char* name, void (*test_function)())
+static void tt_execute(const char* name, void (*test_function)())
 {
   tt_current_test_failed = false;
   test_function();
@@ -85,7 +85,7 @@ void tt_execute(const char* name, void (*test_function)())
   }
 }
 
-bool tt_assert(const char* file, int line, const char* msg, const char* expression, bool pass)
+static bool tt_assert(const char* file, int line, const char* msg, const char* expression, bool pass)
 {
   tt_current_msg = msg;
   tt_current_expression = expression;
@@ -95,17 +95,19 @@ bool tt_assert(const char* file, int line, const char* msg, const char* expressi
   return pass;
 }
 
-int tt_report(void)
+static int tt_report(void)
 {
   if (tt_fails) {
     printf("%c%sFAILED%c%s [%s] (passed:%d, failed:%d, total:%d)\n",
       TT_COLOR_CODE, TT_COLOR_RED, TT_COLOR_CODE, TT_COLOR_RESET,
       tt_current_file, tt_passes, tt_fails, tt_passes + tt_fails);
+    tt_passes = tt_fails = 0;
     return -1;
   } else {
     printf("%c%sPASSED%c%s [%s] (total:%d)\n", 
       TT_COLOR_CODE, TT_COLOR_GREEN, TT_COLOR_CODE, TT_COLOR_RESET,
       tt_current_file, tt_passes);
+    tt_passes = tt_fails = 0;
     return 0;
   }
 }

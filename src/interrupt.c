@@ -73,3 +73,5 @@ void init_interrupts() {
 #undef DO_ISR
 }
 
+void disable_interrupts() {asm("cli");}
+void enable_interrupts() {asm("sti");}

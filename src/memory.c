@@ -16,10 +16,15 @@ typedef struct AllocationHeaderT {
 
 struct HeapT {
     uint32_t sequence;
+    uint32_t currentObjects;
     Block * block;
 } Heap;
 
 struct HeapT heap;
+
+uint32_t kmem_current_objects() {
+    return heap.currentObjects;
+}
 
 void kmem_add_block(uint64_t start, uint64_t size, size_t chunkSize) {
     Block * newb = (Block*) start;
@@ -41,6 +46,7 @@ void kmem_add_block(uint64_t start, uint64_t size, size_t chunkSize) {
 void kmem_init() {
     heap.block = 0;
     heap.sequence = 0;
+    heap.currentObjects = 0;
 }
 
 static inline int test_bits(uint8_t p, int mask) {
@@ -76,6 +82,7 @@ void* kmem_alloc(size_t size) {
                     char *memory = kmem_block_start(block) + offset;
                     ((AllocationHeader*)memory)->chunks = requiredChunks;
                     ((AllocationHeader*)memory)->sequence = heap.sequence++;
+                    heap.currentObjects ++;
 
                     return memory + sizeof(AllocationHeader);
                 }
@@ -96,6 +103,8 @@ static void kmem_free_from_block(Block* block, AllocationHeader * header) {
 
     uint32_t mask = ((1 << header->chunks) - 1) << shift;
     block->chunkMasks[chunkSet] &= ~mask;
+
+    heap.currentObjects--;
 
 //    printf("chunks %d, sequence %d\n", header->chunks, header->sequence);
 //    printf("offset %x, chunk %x, mask %x, firstForChunk %p, header %p\n", offset, chunkSet, mask, firstForChunkSet, header);

@@ -4,6 +4,7 @@
 #include "memory.h"
 #include "rtc.h"
 #include "interrupt.h"
+#include "task.h"
 
 void dump_regs(registers_t* regs) {
     console_print_string("rax "); console_put_hex64(regs->rax);
@@ -48,9 +49,10 @@ void breakpoint(registers_t* regs) {
 void protection(registers_t* regs) {
     console_print_string("gpf\n");
     dump_regs(regs);
+    panic("cannot continue");
 }
 
-void timer_irq(registers_t* regs) {
+static void update_clock() {
     static uint32_t time;
     uint32_t now = read_rtc();
     if (time != now) {
@@ -69,6 +71,11 @@ void timer_irq(registers_t* regs) {
         clock[12] = (sec / 10) + '0';
         clock[14] = (sec % 10) + '0';
     }
+}
+
+Task * update_task;
+void timer_irq(registers_t* regs) {
+    task_enqueue(update_task);
 }
 
 void main() {
@@ -100,5 +107,7 @@ void main() {
     console_put_hex64(here);
 
     //enable the timer
+    update_task = task_alloc(update_clock);
+    add_ref(update_task);
     register_interrupt_handler(IRQ0, timer_irq);
 }

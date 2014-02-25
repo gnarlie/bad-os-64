@@ -6,6 +6,7 @@ USE64
 [EXTERN console_clear_screen]
 [EXTERN console_print_string]
 [EXTERN console_put_hex]
+[EXTERN task_poll_for_work]
 
 [GLOBAL start]
 [GLOBAL create_gate]
@@ -22,6 +23,7 @@ done:
 ;    inc byte [count]
 ;    mov ax,[count]
 ;    mov [0xB8000], al
+    call task_poll_for_work
     hlt
     jmp done
 
