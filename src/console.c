@@ -27,6 +27,21 @@ static void scroll() {
     current -= cols;
 }
 
+void console_put_dec(uint32_t v);
+static void set_cursor() {
+    // ftp://ftp.apple.asimov.net/pub/apple_II/documentation/hardware/video/Second%20Sight%20VGA%20Registers.pdf
+    static const uint16_t basePort= 0x3d4;
+    uint16_t position = (current - VideoStart) / 2;
+    outb(basePort, 0x0a);
+    outb(basePort+1, 13); // start scan line
+    outb(basePort, 0x0b);
+    outb(basePort+1, 14); // end scan line
+    outb(basePort, 0x0e);
+    outb(basePort+1, (position >> 8) & 0xff); // position y
+    outb(basePort, 0x0f);
+        outb(basePort+1, position & 0xff); //position x
+}
+
 void console_put(char c) {
     switch(c) {
         case('\n'):
@@ -48,6 +63,8 @@ void console_put(char c) {
     if (current > VideoStart + (lines - 1) * cols) {
         scroll();
     }
+
+    set_cursor();
 }
 
 void console_clear_screen() {
@@ -57,6 +74,7 @@ void console_clear_screen() {
     }
 
     current = VideoStart;
+    set_cursor();
 }
 
 void console_print_string(const char * str) {
