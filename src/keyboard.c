@@ -1,15 +1,17 @@
 #include "keyboard.h"
 #include "common.h"
 #include "console.h"
+#include "task.h"
+#include "interrupt.h"
 
-char scancode[] = "\000\0331234567890-=\b"
+static char scancode[] = "\000\0331234567890-=\b"
                   "\tqwertyuiop[]\n"
                   "\000asdfghjkl;'`"
                   "\000\\zxcvbnm,./\000"
                   "*\000 \000FFFFFFFFFF\000\000"
                   "7894561230."
                   "\000\000\000FF\000\000\000";
-char scancodeCap[] =  "\000\000!@#$%^&*()_+\b"
+static char scancodeCap[] =  "\000\000!@#$%^&*()_+\b"
                       "\tQWERTYUIOP{}\n"
                       "\000ASDFGHJKL:\"~"
                       "\000|ZXCVBNM<>?\000"
@@ -41,22 +43,22 @@ static void updateLedState() {
    outb(0x60, 0xed);
    waitForKeyboard();
    outb(0x60, state);
-
 }
 
-void numLock(KeyState state) {
+static void numLock(KeyState state) {
     if (state == DOWN) {
         numEnabled = !numEnabled;
         updateLedState();
     }
 }
-void scrollLock(KeyState state) {
+static void scrollLock(KeyState state) {
     if (state == DOWN) {
         scrollEnabled = !scrollEnabled;
         updateLedState();
     }
 }
-void capsLock(KeyState state) {
+
+static void capsLock(KeyState state) {
     if (state == DOWN) {
         capsEnabled = !capsEnabled;
         updateLedState();
@@ -65,8 +67,38 @@ void capsLock(KeyState state) {
 
 void fkey(uint8_t f, KeyState state)  { }
 
-void keyboard_irq() {
-    uint8_t u = inb(0x60);
+///// buffer handling
+typedef struct KeyboardBufferT {
+    char data[16];
+    int r;
+    int w;
+} KeyboardBuffer;
+
+static void buffer_init(KeyboardBuffer* b) {
+    b->r = b->w = sizeof(b->data);
+}
+
+static int buffer_has_data(KeyboardBuffer* b) {
+    return b->r != b->w;
+}
+
+static char buffer_pop(KeyboardBuffer* b) {
+    if (++b->r == sizeof(b->data)) b->r = 0;
+
+    return b->data[b->r];
+}
+
+static void buffer_push(KeyboardBuffer* b, char c) {
+    if (++b->w == sizeof(b->data)) b->w = 0;
+    b->data[b->w] = c;
+}
+
+/////
+
+static KeyboardBuffer buffer;
+
+
+static void read_key(char u) {
     KeyState dir = u & 0x80 ? UP : DOWN;
     switch(u & 0x7F) {
         case(0x1d): //left
@@ -114,6 +146,26 @@ void keyboard_irq() {
             }
         }
     }
+}
 
+static void read_keys() {
+    char c;
+    while(buffer_has_data(&buffer)) {
+        read_key(buffer_pop(&buffer));
+    }
+}
+
+static Task * readKeybd;
+
+void init_keyboard() {
+    register_interrupt_handler(IRQ1, keyboard_irq);
+    readKeybd = task_alloc(read_keys);
+    add_ref(readKeybd);
+}
+
+void keyboard_irq() {
+    uint8_t u = inb(0x60);
+    buffer_push(&buffer, u);
+    task_enqueue(readKeybd);
 }
 

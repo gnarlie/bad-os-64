@@ -95,7 +95,7 @@ void main() {
     console_put_dec(cpuSpeed);
     console_print_string("MHz \n");
 
-    register_interrupt_handler(IRQ1, keyboard_irq);
+    init_keyboard();
     register_interrupt_handler(3, breakpoint);
     register_interrupt_handler(0xd, protection);
 
@@ -105,8 +105,9 @@ void main() {
     asm volatile ("int $3");
     console_print_string("breakpoint was just after: ");
     console_put_hex64(here);
+    console_print_string("\n");
 
-    //enable the timer
+    //enable the timer and display a clock
     update_task = task_alloc(update_clock);
     add_ref(update_task);
     register_interrupt_handler(IRQ0, timer_irq);

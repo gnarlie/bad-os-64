@@ -13,4 +13,4 @@ To run inside bochs, just use:
 
     make run
 
-
+[![Build Status](https://travis-ci.org/gnarlie/bad-os-64.png?branch=master)](https://travis-ci.org/gnarlie/bad-os-64)
