@@ -16,7 +16,7 @@ test: bin/alltests
 
 .PHONY : test
 
-bin/alltests: $(TEST_OBJS) | $(filter-out out/entry.o out/panic.o out/main.o out/interrupt.o, $(OBJS))
+bin/alltests: $(TEST_OBJS) | $(filter-out out/entry.o out/panic.o out/main.o out/interrupt.o out/keyboard.o, $(OBJS))
 	-mkdir -p bin/
 	$(CC) -o $@ $^ $|
 
@@ -36,7 +36,7 @@ out/test/%.o: test/%.c
 
 
 kernel.sys: $(OBJS)
-	ld -Tsrc/kernel.ld -melf_x86_64 -o /tmp/kernel $^
+	ld  -Map=kernel.sym -Tsrc/kernel.ld -melf_x86_64 -o /tmp/kernel $^
 	cat bootloader/pure64.sys /tmp/kernel > kernel.sys
 
 disk.img: kernel.sys

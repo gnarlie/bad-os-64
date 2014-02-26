@@ -65,31 +65,38 @@ static void capsLock(KeyState state) {
     }
 }
 
-void fkey(uint8_t f, KeyState state)  { }
+void fkey(uint8_t f, KeyState state)  { if (state == DOWN) asm ("int $3"); }
 
 ///// buffer handling
+#define KeyboardBufferSize 1024
 typedef struct KeyboardBufferT {
-    char data[16];
+    char data[KeyboardBufferSize];
     int r;
     int w;
 } KeyboardBuffer;
 
 static void buffer_init(KeyboardBuffer* b) {
-    b->r = b->w = sizeof(b->data);
+    b->r = b->w = 0; // KeyboardBufferSize - 1;
 }
 
 static int buffer_has_data(KeyboardBuffer* b) {
-    return b->r != b->w;
+    return b->r < b->w;
 }
 
 static char buffer_pop(KeyboardBuffer* b) {
-    if (++b->r == sizeof(b->data)) b->r = 0;
+//    if (b->r + 1 == KeyboardBufferSize)
+//        b->r = 0;
+//    else
+        b->r++;
 
     return b->data[b->r];
 }
 
 static void buffer_push(KeyboardBuffer* b, char c) {
-    if (++b->w == sizeof(b->data)) b->w = 0;
+//    if (b->w + 1 == KeyboardBufferSize)
+//        b->w = 0;
+//    else
+        b->w++;
     b->data[b->w] = c;
 }
 
@@ -137,7 +144,7 @@ static void read_key(char u) {
         case(0xfd):
         case(0xfe):
         case(0xff):
-            console_print_string("keyboard error"); // TODO... stay off console by default
+            console_print_string("keyboard error\n"); // TODO... stay off console by default
             break;
         default: {
             if (u < sizeof(scancode)) {
@@ -158,9 +165,11 @@ static void read_keys() {
 static Task * readKeybd;
 
 void init_keyboard() {
-    register_interrupt_handler(IRQ1, keyboard_irq);
     readKeybd = task_alloc(read_keys);
+    buffer_init(&buffer);
     add_ref(readKeybd);
+
+    register_interrupt_handler(IRQ1, keyboard_irq);
 }
 
 void keyboard_irq() {

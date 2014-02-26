@@ -23,6 +23,8 @@ Task * task_alloc(tasklet callback) {
     task->task = callback;
     task->next = NULL;
     task->refs = 0;
+
+    return task;
 }
 
 void task_enqueue(Task * task) {
@@ -62,7 +64,7 @@ tasklet task_get() {
 
 void task_poll_for_work() {
     tasklet t;
-    while(t = task_get()) {
+    while((t = task_get())) {
         t();
     }
 }

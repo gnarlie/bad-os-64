@@ -8,3 +8,9 @@ void panic(const char* why) {
     asm ("cli");
     asm ("hlt");
 }
+
+void warn(const char * what) {
+    console_print_string("WARN :");
+    console_print_string(what);
+    console_print_string("\n");
+}

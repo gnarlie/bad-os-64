@@ -15,9 +15,6 @@ static char get_cmos_reg(int reg) {
     return inb(CMOS_DATA);
 }
 
-static uint32_t seconds_of(int year, int month, int day) {
-    return 0;
-}
 
 static uint8_t from_bcd(char x) {
     return (x & 0xf) + (x / 16) * 10;
@@ -46,14 +43,16 @@ static uint32_t read_rtc_internal() {
 
     if (0 == (regB & 0x02) && (hour & 0x80)) {
         if (hour & 0x80) hour = 0;
-        else hour = (hour & 0x7f + 12 % 24);
+        else hour = ((hour & 0x7f) + 12 % 24);
     }
 
     year += 2000;
 
-    return seconds_of(year, month, day) +
+    return
         ((hour * 60) + minute) * 60 + second;
 }
+
+#include "console.h"
 
 uint32_t read_rtc() {
     uint32_t a, b;

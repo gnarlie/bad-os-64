@@ -5,3 +5,4 @@ kernel.sys
 out/
 core
 bin/
+kernel.sym

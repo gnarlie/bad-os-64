@@ -7,25 +7,34 @@ USE64
 [EXTERN console_print_string]
 [EXTERN console_put_hex]
 [EXTERN task_poll_for_work]
+[EXTERN panic]
 
 [GLOBAL start]
 [GLOBAL create_gate]
 [GLOBAL create_isr_handler]
+[GLOBAL main_loop]
 [GLOBAL halt]
 
+
 start:
+    mov rsp, 0x18000
     call console_clear_screen
     mov rdi, hello_message
     call console_print_string
     call main
     sti
-done:
-;    inc byte [count]
-;    mov ax,[count]
-;    mov [0xB8000], al
+    mov [lastStack], esp
+main_loop:
+    mov eax, [lastStack]
+    cmp eax, esp
+    jne stack_slam
     call task_poll_for_work
     hlt
-    jmp done
+    jmp main_loop
+
+stack_slam:
+    mov rdi, stack_differs
+    call console_print_string
 
 create_gate:
     mov rax, rsi
@@ -48,6 +57,7 @@ create_gate:
 ret
 
 %macro PUSH_ALL 0
+    push rbp
     push r15
     push r14
     push r13
@@ -99,7 +109,16 @@ ret
     pop r13
     pop r14
     pop r15
-    add rsp, 8
+    add rsp, 16
+%endmacro
+
+%macro ISR_ERR 1
+    [GLOBAL isr%1]
+    isr%1:
+        cli
+        PUSH_ALL
+        mov edi, dword %1
+        jmp isr_common
 %endmacro
 
 %macro ISR 1
@@ -165,16 +184,16 @@ ISR 4
 ISR 5
 ISR 6
 ISR 7
-ISR 8
+ISR_ERR 8
 ISR 9
-ISR 10
-ISR 11
-ISR 12
-ISR 13
-ISR 14
+ISR_ERR 10
+ISR_ERR 11
+ISR_ERR 12
+ISR_ERR 13
+ISR_ERR 14
 ISR 15
 ISR 16
-ISR 17
+ISR_ERR 17
 ISR 18
 ISR 19
 ISR 20
@@ -190,6 +209,6 @@ ISR 29
 ISR 30
 ISR 31
 
-count dd 0x0
-
+lastStack     dq 0
+stack_differs db `Stack pointer has changed\n`, 0
 hello_message db `Hello, World\n`, 0

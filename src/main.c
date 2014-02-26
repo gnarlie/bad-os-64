@@ -28,16 +28,19 @@ void dump_regs(registers_t* regs) {
     console_print_string("rsi "); console_put_hex64(regs->rsi);
     console_print_string(" rdi "); console_put_hex64(regs->rdi);
     console_print_string("\n");
-    console_print_string("ds  "); console_put_hex64(regs->ds);
-    console_print_string(" es  "); console_put_hex64(regs->es);
-    console_print_string("\n");
-    console_print_string("fs  "); console_put_hex64(regs->fs);
-    console_print_string(" gs  "); console_put_hex64(regs->gs);
+    console_print_string("ds "); console_put_hex(regs->ds);
+    console_print_string(" es "); console_put_hex(regs->es);
+    console_print_string(" fs "); console_put_hex(regs->fs);
+    console_print_string(" gs "); console_put_hex(regs->gs);
     console_print_string("\n");
     console_print_string("rip "); console_put_hex64(regs->rip);
-    console_print_string(" cs  "); console_put_hex64(regs->cs);
+    console_print_string(" cs  "); console_put_hex(regs->cs);
     console_print_string("\n");
     console_print_string("rflags "); console_put_hex64(regs->rflags);
+    console_print_string("\n");
+    console_print_string("error "); console_put_hex64(regs->errorCode);
+    console_print_string("\n");
+    console_print_string("rbp "); console_put_hex64(regs->rbp);
     console_print_string("\n");
 }
 
@@ -55,6 +58,7 @@ void protection(registers_t* regs) {
 static void update_clock() {
     static uint32_t time;
     uint32_t now = read_rtc();
+
     if (time != now) {
         time = now;
 
@@ -87,10 +91,10 @@ void main() {
     // actual memory map
     kmem_add_block(0x200000, 1024*1024*1024, 0x400);
 
-    uint32_t lapicBase = *(uint32_t*)0x5060;
-    console_print_string("LAPIC ");
-    console_put_hex64(lapicBase);
-    console_print_string(". CPU Speed ");
+    uint32_t ram = *(uint32_t*)0x5020;
+    console_print_string("System RAM: ");
+    console_put_dec(ram);
+    console_print_string("MB. CPU Speed ");
     uint16_t cpuSpeed = *(uint16_t*)0x5010;
     console_put_dec(cpuSpeed);
     console_print_string("MHz \n");
@@ -105,6 +109,12 @@ void main() {
     asm volatile ("int $3");
     console_print_string("breakpoint was just after: ");
     console_put_hex64(here);
+    console_print_string("\n");
+
+    uint64_t bp;
+    asm volatile ("mov %%rbp, %0" : "=r" (bp));
+    console_print_string("rbp was " );
+    console_put_hex64(bp);
     console_print_string("\n");
 
     //enable the timer and display a clock

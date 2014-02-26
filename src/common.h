@@ -12,6 +12,7 @@ uint8_t inb(uint16_t port);
 void bzero(void * dest, size_t count);
 
 void panic(const char * why);
+void warn(const char * what);
 
 #define NULL ((void*)0)
 

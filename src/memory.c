@@ -91,6 +91,7 @@ void* kmem_alloc(size_t size) {
     }
 
     panic("out of memory");
+    return NULL; //todo teach gcc that panic is one-way
 }
 
 // void printf(const char *, ...);

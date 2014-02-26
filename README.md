@@ -1,4 +1,5 @@
-bad-os-64
+[![Build Status](https://travis-ci.org/gnarlie/bad-os-64.png?branch=master)](https://travis-ci.org/gnarlie/bad-os-64)
+Bad-OS-64
 =========
 
 This is a simple x86-64 kernel.
@@ -13,4 +14,3 @@ To run inside bochs, just use:
 
     make run
 
-[![Build Status](https://travis-ci.org/gnarlie/bad-os-64.png?branch=master)](https://travis-ci.org/gnarlie/bad-os-64)

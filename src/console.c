@@ -1,34 +1,35 @@
 #include "common.h"
 
-static char *VideoStart = (char *) 0xB8000;
+static char * const VideoStart = (char *) 0xB8000;
 static char *current = (char*) 0xB8000;
 
 static const uint16_t lines = 25;
 static const uint16_t cols = 160; // in bytes, 80 columns
 
+
 typedef unsigned long ptrdiff_t;
 
-static void scroll() {
-    char * p = VideoStart;
-    int i;
-    for (; p < VideoStart + (lines - 1) * cols; p += cols) {
-        for(i = 0; i < cols; i++) {
-            p[i] = p[i + cols];
+void scroll() {
+    static int here = 0;
+    if (here) asm( "int $3");
+    here = 1;
+    for (int row = 0; row < lines - 1; row++) {
+        for(int col = 0; col < cols; col++) {
+            VideoStart[row * cols + col] =
+                VideoStart[(1 + row) * cols + col];
         }
     }
 
-    for(i = 0; i < cols; i++) {
-        p[i] = p[i + cols];
-    }
-    for(i = 0; i < cols; i+=2) {
-        p[i + cols] = ' ';
+    char * lastLine = VideoStart + (lines - 1) * cols;
+    for(int i = 0; i < cols; i+=2) {
+        lastLine[i] = ' ';
     }
 
     current -= cols;
+    here = 0;
 }
 
-void console_put_dec(uint32_t v);
-static void set_cursor() {
+void set_cursor() {
     // ftp://ftp.apple.asimov.net/pub/apple_II/documentation/hardware/video/Second%20Sight%20VGA%20Registers.pdf
     static const uint16_t basePort= 0x3d4;
     uint16_t position = (current - VideoStart) / 2;
@@ -36,10 +37,13 @@ static void set_cursor() {
     outb(basePort+1, 13); // start scan line
     outb(basePort, 0x0b);
     outb(basePort+1, 14); // end scan line
-    outb(basePort, 0x0e);
-    outb(basePort+1, (position >> 8) & 0xff); // position y
-    outb(basePort, 0x0f);
+
+    if (position < 80 * 25) {
+        outb(basePort, 0x0e);
+        outb(basePort+1, (position >> 8) & 0xff); // position y
+        outb(basePort, 0x0f);
         outb(basePort+1, position & 0xff); //position x
+    }
 }
 
 void console_put(char c) {
@@ -60,7 +64,7 @@ void console_put(char c) {
             current += 2;
     }
 
-    if (current > VideoStart + (lines - 1) * cols) {
+    while (current >= VideoStart + lines  * cols) {
         scroll();
     }
 

@@ -6,5 +6,5 @@ mouse: enabled=0
 clock: sync=both
 cpu: ips=5000000
 display_library:$DISPLAY_LIBRARY
-com1: enabled=1, mode=term, dev=/dev/pts/0
+#com1: enabled=1, mode=term, dev=/dev/pts/0
 
