@@ -37,6 +37,17 @@ void dump_regs(registers_t* regs) {
     console_print_string(" cs  "); console_put_hex(regs->cs);
     console_print_string("\n");
     console_print_string("rflags "); console_put_hex64(regs->rflags);
+    console_print_string(regs->rflags & 1 << 14 ? " N" : " n");
+    console_print_string(regs->rflags & 1 << 11 ? "O" : "o");
+    console_print_string(regs->rflags & 1 << 10 ? "D" : "d");
+    console_print_string(regs->rflags & 1 << 9 ? "I" : "i");
+    console_print_string(regs->rflags & 1 << 8 ? "T" : "t");
+    console_print_string(regs->rflags & 1 << 7 ? "S" : "s");
+    console_print_string(regs->rflags & 1 << 6 ? "Z" : "z");
+    console_print_string(regs->rflags & 1 << 4 ? "A" : "a");
+    console_print_string(regs->rflags & 1 << 2 ? "P" : "p");
+    console_print_string(regs->rflags & 1 ? "C" : "c");
+    console_print_string(" IOPL="); console_put_hex((regs->rflags >> 12) & 3);
     console_print_string("\n");
     console_print_string("error "); console_put_hex64(regs->errorCode);
     console_print_string("\n");
@@ -106,13 +117,13 @@ void main() {
     // try a breakpoint
     uint64_t here;
     asm volatile ("lea (%%rip), %0" : "=r" (here) );
-    asm volatile ("int $3");
+    asm volatile ("int $3" ::: "memory" );
     console_print_string("breakpoint was just after: ");
     console_put_hex64(here);
     console_print_string("\n");
 
     uint64_t bp;
-    asm volatile ("mov %%rbp, %0" : "=r" (bp));
+    asm volatile ("mov %%rbp, %0" : "=r" (bp) );
     console_print_string("rbp was " );
     console_put_hex64(bp);
     console_print_string("\n");

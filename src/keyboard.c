@@ -68,7 +68,7 @@ static void capsLock(KeyState state) {
 void fkey(uint8_t f, KeyState state)  { if (state == DOWN) asm ("int $3"); }
 
 ///// buffer handling
-#define KeyboardBufferSize 1024
+#define KeyboardBufferSize 32
 typedef struct KeyboardBufferT {
     char data[KeyboardBufferSize];
     int r;
@@ -80,22 +80,22 @@ static void buffer_init(KeyboardBuffer* b) {
 }
 
 static int buffer_has_data(KeyboardBuffer* b) {
-    return b->r < b->w;
+    return b->r != b->w;
 }
 
 static char buffer_pop(KeyboardBuffer* b) {
-//    if (b->r + 1 == KeyboardBufferSize)
-//        b->r = 0;
-//    else
+    if (b->r + 1 == KeyboardBufferSize)
+        b->r = 0;
+    else
         b->r++;
 
     return b->data[b->r];
 }
 
 static void buffer_push(KeyboardBuffer* b, char c) {
-//    if (b->w + 1 == KeyboardBufferSize)
-//        b->w = 0;
-//    else
+    if (b->w + 1 == KeyboardBufferSize)
+        b->w = 0;
+    else
         b->w++;
     b->data[b->w] = c;
 }
@@ -144,7 +144,7 @@ static void read_key(char u) {
         case(0xfd):
         case(0xfe):
         case(0xff):
-            console_print_string("keyboard error\n"); // TODO... stay off console by default
+            warn("keyboard error\n"); // TODO... stay off console by default
             break;
         default: {
             if (u < sizeof(scancode)) {
@@ -155,14 +155,14 @@ static void read_key(char u) {
     }
 }
 
+static Task * readKeybd;
+
 static void read_keys() {
     char c;
     while(buffer_has_data(&buffer)) {
         read_key(buffer_pop(&buffer));
     }
 }
-
-static Task * readKeybd;
 
 void init_keyboard() {
     readKeybd = task_alloc(read_keys);

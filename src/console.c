@@ -6,17 +6,26 @@ static char *current = (char*) 0xB8000;
 static const uint16_t lines = 25;
 static const uint16_t cols = 160; // in bytes, 80 columns
 
-
 typedef unsigned long ptrdiff_t;
 
+static char hex(int i) {
+    if (i > 16) return '?';
+    if (i > 9) return 'A' + (i - 10);
+    else return '0' + i;
+}
+
 void scroll() {
-    static int here = 0;
-    if (here) asm( "int $3");
-    here = 1;
-    for (int row = 0; row < lines - 1; row++) {
-        for(int col = 0; col < cols; col++) {
-            VideoStart[row * cols + col] =
-                VideoStart[(1 + row) * cols + col];
+//    uint32_t esp;
+//    asm ("mov %%esp, %0" : "=r"(esp));
+//    for (int i = 28; i >= 0; i -= 4) {
+//        VideoStart[cols * 3 - i / 2 - 2] = hex((esp >> i) & 0xf );
+//    }
+
+    for (uint16_t row = 0; row < lines - 1; row++) {
+        for(uint16_t col = 0; col < cols; col++) {
+            uint16_t pos = row * cols + col;
+            VideoStart[pos] =
+                VideoStart[pos + cols];
         }
     }
 
@@ -26,7 +35,6 @@ void scroll() {
     }
 
     current -= cols;
-    here = 0;
 }
 
 void set_cursor() {
@@ -64,7 +72,7 @@ void console_put(char c) {
             current += 2;
     }
 
-    while (current >= VideoStart + lines  * cols) {
+    while (current >= VideoStart + (lines  - 1) * cols) {
         scroll();
     }
 
@@ -85,12 +93,6 @@ void console_print_string(const char * str) {
     while (*str) {
         console_put(*str++);
     }
-}
-
-static char hex(int i) {
-    if (i > 16) return '?';
-    if (i > 9) return 'A' + (i - 10);
-    else return '0' + i;
 }
 
 void console_put_hex(uint32_t v) {

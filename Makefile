@@ -1,4 +1,4 @@
-CFLAGS=-nostdlib -nostdinc -fno-builtin -fno-stack-protector -std=gnu99  -MMD -MP -g -Werror
+CFLAGS=-O0 -nostdlib -nostdinc -fno-builtin -fno-stack-protector -std=gnu99  -MMD -MP -g -Werror -mno-red-zone
 TEST_CFLAGS=-std=gnu99 -Werror -MMD -MP -I src
 DISPLAY_LIBRARY ?= sdl
 

@@ -66,10 +66,10 @@ ret
     push r10
     push r9
     push r8
+    push rdx
     push rcx
     push rbx
     push rax
-    push rdx
     push rsi
     push rdi
 
@@ -109,7 +109,8 @@ ret
     pop r13
     pop r14
     pop r15
-    add rsp, 16
+    pop rbp
+    add rsp, 8
 %endmacro
 
 %macro ISR_ERR 1
