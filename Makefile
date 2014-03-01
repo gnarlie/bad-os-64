@@ -9,7 +9,7 @@ TEST_SRC=$(shell find test -name '*.c')
 OBJS=$(patsubst src/%.asm, out/%.o, $(ASM_FILES)) $(patsubst src/%.c, out/%.o, $(C_FILES))
 TEST_OBJS=$(patsubst test/%.c, out/test/%.o, $(TEST_SRC))
 
-default: kernel.sys
+default: disk.img
 
 test: bin/alltests
 	bin/alltests
@@ -21,7 +21,7 @@ bin/alltests: $(TEST_OBJS) | $(filter-out out/entry.o out/panic.o out/main.o out
 	$(CC) -o $@ $^ $|
 
 run: disk.img
-	IMAGE=disk.img DISPLAY_LIBRARY=$(DISPLAY_LIBRARY) CYL=128 LD_PRELOAD=/usr/lib/x86_64-linux-gnu/libXpm.so.4 bochs -f etc/bochsrc
+	IMAGE=disk.img DISPLAY_LIBRARY=$(DISPLAY_LIBRARY) CYL=128 LD_PRELOAD=/usr/lib/x86_64-linux-gnu/libXpm.so.4 bochs -q -f etc/bochsrc
 
 out/%.o: src/%.c
 	$(CC) -c $(CFLAGS) -o $@ $<

@@ -16,10 +16,17 @@ void isr_handler(uint8_t n, registers_t * regs) {
     }
 }
 
+#include "console.h"
+
 void irq_handler(uint8_t intNo, registers_t * regs) {
     isr_t handler = interrupt_handlers[intNo];
     if (handler) {
         handler(regs);
+    }
+    else {
+        console_print_string("Stray IRQ ");
+        console_put_hex16(intNo);
+        console_print_string("\n");
     }
 }
 
@@ -27,8 +34,8 @@ extern void create_gate(int, void(*)());
 
 void init_interrupts() {
     //tell the pic to enable more interupts (Pure64 just did cascade, keyboard, and RTC)
-    outb(0x21, 0xf8);
-//    outb(0xa1, 0);
+    outb(0x21, 0);
+    outb(0xa1, 0);
 
 #define DO_IRQ(x,y)   extern void irq##x(); create_gate(y, irq##x);
     DO_IRQ(0, 32);

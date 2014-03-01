@@ -95,17 +95,23 @@ void console_print_string(const char * str) {
     }
 }
 
+void console_put_hex8(uint8_t v) {
+    console_put(hex((v >> 4) & 0xf ));
+    console_put(hex(v  & 0xf));
+}
+
+void console_put_hex16(uint16_t v) {
+    console_put_hex8(v >> 16);
+    console_put_hex8(v);
+}
+
 void console_put_hex(uint32_t v) {
-    console_put('0');
-    console_put('x');
     for (int i = 28; i >= 0; i -= 4) {
         console_put(hex((v >> i) & 0xf ));
     }
 }
 
 void console_put_hex64(uint64_t v) {
-    console_put('0');
-    console_put('x');
     for (int i = 60; i >= 0; i -= 4) {
         console_put(hex((v >> i) & 0xf ));
     }

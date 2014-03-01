@@ -5,6 +5,8 @@
 #include "rtc.h"
 #include "interrupt.h"
 #include "task.h"
+#include "pci.h"
+#include "ne2k.h"
 
 void dump_regs(registers_t* regs) {
     console_print_string("rax "); console_put_hex64(regs->rax);
@@ -98,9 +100,6 @@ void main() {
     init_interrupts();
 
     kmem_init();
-    // need to make these less arbiratry, based on the
-    // actual memory map
-    kmem_add_block(0x200000, 1024*1024*1024, 0x400);
 
     uint32_t ram = *(uint32_t*)0x5020;
     console_print_string("System RAM: ");
@@ -110,23 +109,24 @@ void main() {
     console_put_dec(cpuSpeed);
     console_print_string("MHz \n");
 
+    // need to make these less arbiratry, based on the
+    // actual memory map
+    kmem_add_block(0x200000, 1024*1024*1024, 0x400);
+
+    init_pci();
+    init_ne2k();
+
     init_keyboard();
     register_interrupt_handler(3, breakpoint);
     register_interrupt_handler(0xd, protection);
 
     // try a breakpoint
-    uint64_t here;
-    asm volatile ("lea (%%rip), %0" : "=r" (here) );
-    asm volatile ("int $3" ::: "memory" );
-    console_print_string("breakpoint was just after: ");
-    console_put_hex64(here);
-    console_print_string("\n");
-
-    uint64_t bp;
-    asm volatile ("mov %%rbp, %0" : "=r" (bp) );
-    console_print_string("rbp was " );
-    console_put_hex64(bp);
-    console_print_string("\n");
+//    uint64_t here;
+//    asm volatile ("lea (%%rip), %0" : "=r" (here) );
+//    asm volatile ("int $3" ::: "memory" );
+//    console_print_string("breakpoint was just after: ");
+//    console_put_hex64(here);
+//    console_print_string("\n");
 
     //enable the timer and display a clock
     update_task = task_alloc(update_clock);
