@@ -4,6 +4,10 @@
 
 #include "console.h"
 #include "memory.h"
+#include "task.h"
+
+#include "net/ethernet.h"
+#include "net/ntox.h"
 
 uint32_t iomem;
 
@@ -12,6 +16,8 @@ uint32_t iomem;
 #define PSTOP (iomem + 2)
 #define BOUNDRY (iomem + 3)
 #define TSTART (iomem + 4)
+#define TXCNTLO (iomem + 5)
+#define TXCNTHI (iomem + 6)
 #define ISR (iomem + 7)
 #define REMSTARTADDRLO (iomem + 0x8)
 #define REMSTARTADDRHI (iomem + 0x9)
@@ -31,7 +37,6 @@ enum State {
 } state;
 
 enum Ne2k_ISRBits {
-
     PacketReceived = 1,
     PacketTransmitted = 2,
     ReceiveError = 4,
@@ -58,8 +63,6 @@ enum Ne2K_CmdBits{
     Page3 = 0xc0
 };
 
-static uint8_t buffer[1600];
-
 static int tx_start_page = 0x40; // start of NE2000 buffer
 static int rx_start_page = 0x4c;
 static int stop_page = 0x80;     // end of NE2000 buffer
@@ -79,9 +82,9 @@ static void ne2k_irq(registers_t* regs) {
         if (frame == stop_page)
             frame = rx_start_page;
 
-        console_put_hex8(rxpage);
-        console_put_hex8(frame);
-        console_print_string(" ");
+        //console_put_hex8(rxpage);
+        //console_put_hex8(frame);
+        //console_print_string(" ");
 
         while (rxpage != frame) {
 
@@ -115,18 +118,21 @@ static void ne2k_irq(registers_t* regs) {
             outb(REMBCOUNTHI, hdr.header.count >> 8);
 
             // 16 bits at a time, up to a page (TODO handle larger reads)
+            uint8_t * buffer = kmem_alloc(size);
             for (uint16_t s = 0; s < size; s+=2) {
                uint16_t d = inw(iomem + 0x10);
-               buffer[s] = d >> 8;
-               buffer[s+1] = d & 0xff; //TODO, handle odd reads
-               console_put_hex8(buffer[s]);
-               console_put_hex8(buffer[s+1]);
+               buffer[s+1] = d >> 8;
+               buffer[s] = d & 0xff;
+               //console_put_hex8(buffer[s]);
+               //console_put_hex8(buffer[s+1]);
             }
             if (size & 1) {
                uint8_t d = inb(iomem + 0x10);
                buffer[size - 1] = d;
                console_put_hex8(d);
             }
+
+            ethernet_packet(/*device, */ buffer);
 
             frame = hdr.header.next;
             outb(BOUNDRY, frame - 1);
@@ -141,8 +147,57 @@ static void ne2k_irq(registers_t* regs) {
     outb(ISR, 0xff); // clear ISR
 }
 
+static unsigned char next[2024];
+static uint16_t nextSize;
+static Task * sendTask;
+
+static void send_sync() {
+    // stage
+    outb(iomem, NoDma|Page0);
+    outb(IMR, 0); // disable interrupts
+    outb(REMBCOUNTLO, nextSize & 0xff);
+    outb(REMBCOUNTHI, nextSize >> 8);
+    outb(REMSTARTADDRLO, 0);
+    outb(REMSTARTADDRHI, tx_start_page);
+
+    //console_print_string("\nSend: ");
+    for(int i = 0; i < nextSize; i+=2) {
+        uint16_t lo = next[i];
+        uint16_t hi = next[i+1];
+        uint16_t data = lo | hi << 8;
+        //console_put_hex16(ntos(data));
+        //console_print_string(" ");
+        outw(iomem+0x10, data);
+    }
+    if (nextSize % 2) outb(iomem+0x10, next[nextSize - 1]);
+
+    outb(ISR, 0x40);
+
+    // trigger
+    outb(iomem, NoDma|Page0);
+    outb(TXCNTLO, nextSize & 0xff);
+    outb(TXCNTHI, nextSize >> 8);
+    outb(TSTART, tx_start_page);
+    outb(IMR, ImrAllIsr);
+    outb(iomem, NoDma|Transmit|Start);
+}
+
+void ethernet_send(const void*data, uint16_t size) {
+    //console_print_string("\n");
+    nextSize = size;
+    for(int i = 0; i < size; i++) {
+        next[i] = ((const char*)data)[i];
+        //console_put_hex8(next[i]);
+    }
+
+    //console_print_string("\n");
+    task_enqueue(sendTask);
+}
+
 static void initialize(uint8_t intr, uint32_t bar0) {
     state = Initializing;
+    sendTask = task_alloc(send_sync);
+    add_ref(sendTask);
 
     iomem = bar0 & ~3;
     console_print_string("Found ne2k on IRQ ");

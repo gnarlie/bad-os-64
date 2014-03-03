@@ -17,6 +17,8 @@ int main(int argc, char**argv) {
     RUN(runSomeTasks);
     RUN(tasksDontDoubleQueue); rc |= TEST_REPORT();
 
+    RUN(convertAll); rc |= TEST_REPORT();
+
     return rc;
 }
 

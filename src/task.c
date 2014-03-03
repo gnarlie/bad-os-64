@@ -27,6 +27,11 @@ Task * task_alloc(tasklet callback) {
     return task;
 }
 
+void task_enqueue_easy(tasklet t) {
+    Task * task = task_alloc(t);
+    task_enqueue(task);
+}
+
 void task_enqueue(Task * task) {
     if (task->next) return; // already enqueued.
 

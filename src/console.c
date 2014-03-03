@@ -101,7 +101,7 @@ void console_put_hex8(uint8_t v) {
 }
 
 void console_put_hex16(uint16_t v) {
-    console_put_hex8(v >> 16);
+    console_put_hex8(v >> 8);
     console_put_hex8(v);
 }
 
