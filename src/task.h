@@ -2,18 +2,19 @@
 
 #include "common.h"
 
-typedef void (*tasklet)();
+typedef void (*tasklet)(void*);
 
-typedef struct NodeT {
+typedef struct TaskT {
     tasklet task;
+    void * user;
     uint32_t refs;
-    struct NodeT* next;
+    struct TaskT* next;
 } Task;
 
 void task_enqueue_easy(tasklet task);
 void task_enqueue(Task *);
-Task * task_alloc(tasklet task);
+Task * task_alloc(tasklet task, void* user);
 
-tasklet task_get();
+Task* task_get();
 
 void task_poll_for_work();

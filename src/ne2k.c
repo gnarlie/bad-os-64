@@ -8,33 +8,29 @@
 
 #include "net/ethernet.h"
 #include "net/ntox.h"
-
-uint32_t iomem;
+#include "net/device.h"
 
 // Page0
-#define PSTART (iomem + 1)
-#define PSTOP (iomem + 2)
-#define BOUNDRY (iomem + 3)
-#define TSTART (iomem + 4)
-#define TXCNTLO (iomem + 5)
-#define TXCNTHI (iomem + 6)
-#define ISR (iomem + 7)
-#define REMSTARTADDRLO (iomem + 0x8)
-#define REMSTARTADDRHI (iomem + 0x9)
-#define REMBCOUNTLO (iomem + 0xa)
-#define REMBCOUNTHI (iomem + 0xb)
-#define RCR (iomem + 0xc)
-#define TCR (iomem + 0xd)
-#define DCR (iomem + 0xe)
-#define IMR (iomem + 0xf)
+#define PSTART (self->iomem + 1)
+#define PSTOP (self->iomem + 2)
+#define BOUNDRY (self->iomem + 3)
+#define TSTART (self->iomem + 4)
+#define TXCNTLO (self->iomem + 5)
+#define TXCNTHI (self->iomem + 6)
+#define ISR (self->iomem + 7)
+#define REMSTARTADDRLO (self->iomem + 0x8)
+#define REMSTARTADDRHI (self->iomem + 0x9)
+#define REMBCOUNTLO (self->iomem + 0xa)
+#define REMBCOUNTHI (self->iomem + 0xb)
+#define RCR (self->iomem + 0xc)
+#define TCR (self->iomem + 0xd)
+#define DCR (self->iomem + 0xe)
+#define IMR (self->iomem + 0xf)
+
+#define DATA (self->iomem + 0x10)
 
 // Page 1
-#define CURPAGE (iomem + 7)
-
-enum State {
-    Initializing,
-    Ready
-} state;
+#define CURPAGE (self->iomem + 7)
 
 enum Ne2k_ISRBits {
     PacketReceived = 1,
@@ -67,34 +63,35 @@ static int tx_start_page = 0x40; // start of NE2000 buffer
 static int rx_start_page = 0x4c;
 static int stop_page = 0x80;     // end of NE2000 buffer
 
-static void ne2k_irq(registers_t* regs) {
-    uint8_t wtf = inb(iomem+0x7);
+static void ne2k_irq(registers_t* regs, void * ptr) {
+    struct netdevice* self = (struct netdevice*) ptr;
+    uint8_t wtf = inb(ISR);
 
     if (wtf & RemoteDmaComplete) {
-        outb(iomem+0x7, RemoteDmaComplete);
+        outb(ISR, RemoteDmaComplete);
     }
 
     if (wtf & PacketReceived) {
-        outb(iomem, NoDma | Page1);
+        outb(self->iomem, NoDma | Page1);
         uint8_t rxpage = inb(CURPAGE);
-        outb(iomem, NoDma | Start);
+        outb(self->iomem, NoDma | Start);
         uint8_t frame = inb(BOUNDRY) + 1;
         if (frame == stop_page)
             frame = rx_start_page;
 
-        //console_put_hex8(rxpage);
-        //console_put_hex8(frame);
+        console_put_hex8(rxpage);
+        console_put_hex8(frame);
         //console_print_string(" ");
 
         while (rxpage != frame) {
 
             // Read the four byte header
-            outb(iomem, NoDma | Start);
+            outb(self->iomem, NoDma | Start);
             outb(REMBCOUNTLO, 4);
             outb(REMBCOUNTHI, 0);
             outb(REMSTARTADDRLO, 0);
             outb(REMSTARTADDRHI, frame);
-            outb(iomem, RemoteRead | Start);
+            outb(self->iomem, RemoteRead | Start);
 
             union {
                 struct {
@@ -105,14 +102,14 @@ static void ne2k_irq(registers_t* regs) {
                 uint32_t val;
             } hdr;
 
-            hdr.val = inl(iomem + 0x10);
+            hdr.val = inl(self->iomem + 0x10);
             uint16_t size = hdr.header.count - sizeof(hdr);
 
             console_print_string("status ");
             console_put_hex8(hdr.header.status);
             console_print_string(": ");
 
-            outb(iomem, NoDma | Start);
+            outb(self->iomem, NoDma | Start);
             outb(REMSTARTADDRLO, 4);
             outb(REMBCOUNTLO, size & 0xff);
             outb(REMBCOUNTHI, hdr.header.count >> 8);
@@ -120,19 +117,19 @@ static void ne2k_irq(registers_t* regs) {
             // 16 bits at a time, up to a page (TODO handle larger reads)
             uint8_t * buffer = kmem_alloc(size);
             for (uint16_t s = 0; s < size; s+=2) {
-               uint16_t d = inw(iomem + 0x10);
+               uint16_t d = inw(DATA);
                buffer[s+1] = d >> 8;
                buffer[s] = d & 0xff;
                //console_put_hex8(buffer[s]);
                //console_put_hex8(buffer[s+1]);
             }
             if (size & 1) {
-               uint8_t d = inb(iomem + 0x10);
+               uint8_t d = inb(DATA);
                buffer[size - 1] = d;
                console_put_hex8(d);
             }
 
-            ethernet_packet(/*device, */ buffer);
+            ethernet_packet(self, buffer);
 
             frame = hdr.header.next;
             outb(BOUNDRY, frame - 1);
@@ -140,20 +137,21 @@ static void ne2k_irq(registers_t* regs) {
 
         console_print_string("\n");
 
-        outb(iomem+0x7, PacketReceived);
+        outb(ISR, PacketReceived);
     }
 
-    outb(iomem, Start|NoDma|Page0);
+    outb(self->iomem, Start|NoDma|Page0);
     outb(ISR, 0xff); // clear ISR
 }
 
+//TODO create linked list of pending sends
 static unsigned char next[2024];
 static uint16_t nextSize;
-static Task * sendTask;
 
-static void send_sync() {
+static void send_sync(void * user) {
+    struct netdevice* self = (struct netdevice*)user;
     // stage
-    outb(iomem, NoDma|Page0);
+    outb(self->iomem, NoDma|Page0);
     outb(IMR, 0); // disable interrupts
     outb(REMBCOUNTLO, nextSize & 0xff);
     outb(REMBCOUNTHI, nextSize >> 8);
@@ -167,23 +165,22 @@ static void send_sync() {
         uint16_t data = lo | hi << 8;
         //console_put_hex16(ntos(data));
         //console_print_string(" ");
-        outw(iomem+0x10, data);
+        outw(DATA, data);
     }
-    if (nextSize % 2) outb(iomem+0x10, next[nextSize - 1]);
+    if (nextSize % 2) outb(DATA, next[nextSize - 1]);
 
     outb(ISR, 0x40);
 
     // trigger
-    outb(iomem, NoDma|Page0);
+    outb(self->iomem, NoDma|Page0);
     outb(TXCNTLO, nextSize & 0xff);
     outb(TXCNTHI, nextSize >> 8);
     outb(TSTART, tx_start_page);
     outb(IMR, ImrAllIsr);
-    outb(iomem, NoDma|Transmit|Start);
+    outb(self->iomem, NoDma|Transmit|Start);
 }
 
-void ethernet_send(const void*data, uint16_t size) {
-    //console_print_string("\n");
+static void ne2k_send(struct netdevice * dev, const void*data, uint16_t size) {
     nextSize = size;
     for(int i = 0; i < size; i++) {
         next[i] = ((const char*)data)[i];
@@ -191,20 +188,22 @@ void ethernet_send(const void*data, uint16_t size) {
     }
 
     //console_print_string("\n");
-    task_enqueue(sendTask);
+    task_enqueue(dev->sendTask);
 }
 
 static void initialize(uint8_t intr, uint32_t bar0) {
-    state = Initializing;
-    sendTask = task_alloc(send_sync);
-    add_ref(sendTask);
+    struct netdevice * self = kmem_alloc(sizeof(struct netdevice));
+    self = kmem_alloc(sizeof(struct netdevice));
+    self->sendTask = task_alloc(send_sync, self);
+    self->send = ne2k_send;
+    add_ref(self->sendTask);
 
-    iomem = bar0 & ~3;
+    self->iomem = bar0 & ~3;
     console_print_string("Found ne2k on IRQ ");
     console_put_dec(intr);
     console_print_string("\n");
 
-    outb(iomem, NoDma|Stop);
+    outb(self->iomem, NoDma|Stop);
     outb(DCR, 0x49);  // DCR -> BYTEXFR|NOLOOP|WORD
     outb(REMBCOUNTLO, 0x0);   // RBCR0 -> 0 size
     outb(REMBCOUNTHI, 0x0);   // RBCR1 -> 0 size
@@ -225,30 +224,30 @@ static void initialize(uint8_t intr, uint32_t bar0) {
     outb(REMBCOUNTHI, 0);
     outb(REMSTARTADDRLO, 0);
     outb(REMSTARTADDRHI, 0);
-    outb(iomem, Start | RemoteRead);
+    outb(self->iomem, Start | RemoteRead);
     for (int i = 0; i < 6; i++) {
-        mac[i] = inb(iomem + 0x10);
+        mac[i] = inb(self->iomem + 0x10);
         if (i) console_print_string(":");
         console_put_hex8(mac[i]);
     }
     console_print_string("\n");
 
     // physical address accepted
-    outb(iomem, NoDma|Page1|Stop); // page 1
+    outb(self->iomem, NoDma|Page1|Stop); // page 1
     for (int i = 0; i < 6; i++) {
-        outb(iomem + i + 1,  mac[i]);
+        outb(self->iomem + i + 1,  mac[i]);
     }
     outb(CURPAGE, rx_start_page); //Current page
 
     // accept all multicast
     for (int i = 0; i < 8; i++) {
-        outb(iomem+8+i, 0xff);
+        outb(self->iomem+8+i, 0xff);
     }
 
-    register_interrupt_handler(intr + 32, ne2k_irq);
+    register_interrupt_handler(intr + 32, ne2k_irq, self);
 
     // Game On!
-    outb(iomem, NoDma|Start|Page0);
+    outb(self->iomem, NoDma|Start|Page0);
     outb(REMBCOUNTLO, 0);
     outb(ISR, 0xff);        // clear ISR
     outb(IMR, ImrAllIsr);   // IMR enable everything

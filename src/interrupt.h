@@ -31,10 +31,10 @@ typedef struct registers {
     uint64_t rflags;
 } registers_t;
 
-typedef void (*isr_t)(registers_t*);
+typedef void (*isr_t)(registers_t*, void*);
 
 void init_interrupts();
-void register_interrupt_handler(uint8_t interrupt, isr_t);
+void register_interrupt_handler(uint8_t interrupt, isr_t, void * user);
 
 void disable_interrupts();
 void enable_interrupts();

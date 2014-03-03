@@ -157,7 +157,7 @@ static void read_key(char u) {
 
 static Task * readKeybd;
 
-static void read_keys() {
+static void read_keys(void* unused) {
     char c;
     while(buffer_has_data(&buffer)) {
         read_key(buffer_pop(&buffer));
@@ -165,14 +165,14 @@ static void read_keys() {
 }
 
 void init_keyboard() {
-    readKeybd = task_alloc(read_keys);
+    readKeybd = task_alloc(read_keys, NULL);
     buffer_init(&buffer);
     add_ref(readKeybd);
 
-    register_interrupt_handler(IRQ1, keyboard_irq);
+    register_interrupt_handler(IRQ1, keyboard_irq, 0);
 }
 
-void keyboard_irq() {
+void keyboard_irq(void* ptr) {
     uint8_t u = inb(0x60);
     buffer_push(&buffer, u);
     task_enqueue(readKeybd);

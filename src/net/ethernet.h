@@ -2,4 +2,6 @@
 
 #include "common.h"
 
-void ethernet_packet(/*device,*/ const uint8_t *packet);
+struct netdevice;
+
+void ethernet_packet(struct netdevice * device, const uint8_t *packet);

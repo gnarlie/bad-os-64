@@ -57,18 +57,19 @@ void dump_regs(registers_t* regs) {
     console_print_string("\n");
 }
 
-void breakpoint(registers_t* regs) {
+void breakpoint(registers_t* regs, void*user) {
     console_print_string("breakpoint!\n");
     dump_regs(regs);
 }
 
-void protection(registers_t* regs) {
+void protection(registers_t* regs, void*user) {
     console_print_string("gpf\n");
     dump_regs(regs);
+    asm ("xchg %bx, %bx");
     panic("cannot continue");
 }
 
-static void update_clock() {
+static void update_clock(void* unused) {
     static uint32_t time;
     uint32_t now = read_rtc();
 
@@ -91,7 +92,7 @@ static void update_clock() {
 }
 
 Task * update_task;
-void timer_irq(registers_t* regs) {
+void timer_irq(registers_t* regs, void*user) {
     task_enqueue(update_task);
 }
 
@@ -117,8 +118,8 @@ void main() {
     init_ne2k();
 
     init_keyboard();
-    register_interrupt_handler(3, breakpoint);
-    register_interrupt_handler(0xd, protection);
+    register_interrupt_handler(3, breakpoint, 0);
+    register_interrupt_handler(0xd, protection, 0);
 
     // try a breakpoint
 //    uint64_t here;
@@ -129,7 +130,7 @@ void main() {
 //    console_print_string("\n");
 
     //enable the timer and display a clock
-    update_task = task_alloc(update_clock);
+    update_task = task_alloc(update_clock, 0);
     add_ref(update_task);
-    register_interrupt_handler(IRQ0, timer_irq);
+    register_interrupt_handler(IRQ0, timer_irq, 0);
 }

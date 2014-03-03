@@ -18,22 +18,23 @@ static Task * tail;
 //    *lock = 0;
 //}
 
-Task * task_alloc(tasklet callback) {
+Task * task_alloc(tasklet callback, void * user) {
     Task * task = (Task*)kmem_alloc(sizeof(Task));
     task->task = callback;
     task->next = NULL;
     task->refs = 0;
+    task->user = user;
 
     return task;
 }
 
 void task_enqueue_easy(tasklet t) {
-    Task * task = task_alloc(t);
+    Task * task = task_alloc(t, 0);
     task_enqueue(task);
 }
 
 void task_enqueue(Task * task) {
-    if (task->next) return; // already enqueued.
+    if (task->next || head == task) return; // already enqueued.
 
     add_ref(task);
     if (!head) {
@@ -48,7 +49,7 @@ void task_enqueue(Task * task) {
     }
 }
 
-tasklet task_get() {
+Task* task_get() {
     if (head) {
 
         disable_interrupts(); //replace with a proper lock
@@ -57,20 +58,18 @@ tasklet task_get() {
         Task * tmp = head;
         head = head->next;
         enable_interrupts();
-
         tmp->next = NULL;
-        release_ref(tmp, kmem_free);
-
-        return t;
+        return tmp;
     }
 
     return NULL;
 }
 
 void task_poll_for_work() {
-    tasklet t;
+    Task* t;
     while((t = task_get())) {
-        t();
+        t->task(t->user);
+        release_ref(t, kmem_free);
     }
 }
 

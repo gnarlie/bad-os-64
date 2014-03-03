@@ -2,8 +2,7 @@
 #include "common.h"
 #include "console.h"
 #include "ntox.h"
-
-typedef char mac[6];
+#include "net/device.h"
 
 struct ethernet_frame {
    mac destination;
@@ -42,7 +41,7 @@ inline static void assign(mac dest, const mac src) {
 
 extern void ethernet_send(const void*, uint16_t);
 
-void reply(mac target, uint32_t ip) {
+void reply(struct netdevice* dev, mac target, uint32_t ip) {
     struct reply {
         struct ethernet_frame frame;
         struct arp_packet arp;
@@ -62,10 +61,10 @@ void reply(mac target, uint32_t ip) {
     assign(reply.arp.targetMac, target);
     reply.arp.targetIp = ntol(ip);
 
-    ethernet_send(&reply, sizeof(reply));
+    dev->send(dev, &reply, sizeof(reply));
 }
 
-void arp_packet(const uint8_t * data) {
+void arp_packet(struct netdevice* dev, const uint8_t * data) {
     struct arp_packet * arp = (struct arp_packet*) data;
 
     console_print_string(" arp ");
@@ -83,7 +82,7 @@ void arp_packet(const uint8_t * data) {
     console_print_string("\n");
 
     if (request && ntol(arp->targetIp) == myIp) {
-        reply(arp->senderMac, ntol(arp->senderIp));
+        reply(dev, arp->senderMac, ntol(arp->senderIp));
     }
 }
 
@@ -91,7 +90,7 @@ void ip_packet(const uint8_t* data) {
     console_print_string(" ip\n");
 }
 
-void ethernet_packet(const uint8_t * data) {
+void ethernet_packet(struct netdevice* dev, const uint8_t * data) {
     struct ethernet_frame *frame = (struct ethernet_frame*) data;
     print_mac("\ndst: ", frame->destination);
     print_mac(" src: ", frame->source);
@@ -101,7 +100,7 @@ void ethernet_packet(const uint8_t * data) {
         return;
     }
     else if (type == 0x0806) {
-        arp_packet(data + sizeof(struct ethernet_frame));
+        arp_packet(dev, data + sizeof(struct ethernet_frame));
         return;
     }
     else {
