@@ -14,6 +14,7 @@ uint16_t inw(uint16_t port);
 uint32_t inl(uint16_t port);
 
 void bzero(void * dest, size_t count);
+void *memcpy(void * dest, const void * src, size_t n);
 
 void panic(const char * why);
 void warn(const char * what);

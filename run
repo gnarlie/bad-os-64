@@ -1,0 +1,7 @@
+LD_PRELOAD=/usr/lib/x86_64-linux-gnu/libXpm.so.4 CYL=128 IMAGE=disk.img DISPLAY_LIBRARY=x  bochs -f etc/bochsrc -q
+
+if [ -e tcpdump.pid ]
+then
+    kill $(cat tcpdump.pid)
+fi
+

@@ -19,6 +19,9 @@ int main(int argc, char**argv) {
 
     RUN(convertAll); rc |= TEST_REPORT();
 
+    RUN(ping);
+    RUN(checksums); rc |= TEST_REPORT();
+
     return rc;
 }
 

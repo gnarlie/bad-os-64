@@ -6,3 +6,5 @@ out/
 core
 bin/
 kernel.sym
+tap.pcap
+tcpdump.pid

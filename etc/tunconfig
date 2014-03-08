@@ -1,2 +1,4 @@
 #!/bin/bash
 ifconfig ${1##/*/} 192.168.3.1
+tcpdump -i ${1##/*/} -w tap.pcap &
+echo $! > tcpdump.pid

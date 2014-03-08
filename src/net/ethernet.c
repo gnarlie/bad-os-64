@@ -3,13 +3,8 @@
 #include "console.h"
 #include "ntox.h"
 #include "net/device.h"
+#include "net/ip.h"
 
-struct ethernet_frame {
-   mac destination;
-   mac source;
-   // 802.1Q tag - four bytes
-   uint16_t sizeOrType;
-} __attribute__ ((packed));
 
 struct arp_packet {
     uint16_t htype;
@@ -23,9 +18,6 @@ struct arp_packet {
     uint32_t targetIp;
 } __attribute__ ((packed));
 
-static mac myMac = {0xb0, 0xc4, 0x20, 0, 0, 0};
-static uint32_t myIp = 0xC0A80302;
-
 static void print_mac(const char * str, char* mac) {
     console_print_string(str);
     for(int i = 0; i < 6; i++) {
@@ -35,11 +27,9 @@ static void print_mac(const char * str, char* mac) {
 }
 
 inline static void assign(mac dest, const mac src) {
-    for (int i = 0; i < 6; i++)
+    for(int i = 0;i < 6; i++)
         dest[i] = src[i];
 }
-
-extern void ethernet_send(const void*, uint16_t);
 
 void reply(struct netdevice* dev, mac target, uint32_t ip) {
     struct reply {
@@ -49,15 +39,15 @@ void reply(struct netdevice* dev, mac target, uint32_t ip) {
 
     struct reply reply;
     assign(reply.frame.destination, target);
-    assign(reply.frame.source, myMac);
+    assign(reply.frame.source, dev->mac);
     reply.frame.sizeOrType = ntos(0x0806);
     reply.arp.htype = ntos(1);
     reply.arp.ptype = ntos(0x0800);
     reply.arp.hlen = 6;
     reply.arp.plen = 4;
     reply.arp.operation = ntos(2);
-    assign(reply.arp.senderMac, myMac);
-    reply.arp.senderIp = ntol(myIp);
+    assign(reply.arp.senderMac, dev->mac);
+    reply.arp.senderIp = ntol(dev->ip);
     assign(reply.arp.targetMac, target);
     reply.arp.targetIp = ntol(ip);
 
@@ -81,22 +71,27 @@ void arp_packet(struct netdevice* dev, const uint8_t * data) {
 
     console_print_string("\n");
 
-    if (request && ntol(arp->targetIp) == myIp) {
+    if (request && ntol(arp->targetIp) == dev->ip) {
         reply(dev, arp->senderMac, ntol(arp->senderIp));
     }
 }
 
-void ip_packet(const uint8_t* data) {
-    console_print_string(" ip\n");
+void ethernet_send(sbuff* sbuff, uint16_t proto, mac dest, struct netdevice* device) {
+    sbuff_pop(sbuff, sizeof(struct ethernet_frame));
+    struct ethernet_frame* frame = (struct ethernet_frame*) sbuff->head;
+    assign(frame->destination, dest);
+    assign(frame->source, device->mac);
+    frame->sizeOrType = ntos(proto);
+
+    device->send(device, sbuff->head, sbuff->currSize);
+    release_ref(sbuff, sbuff_free); //TODO, send sbuff directly to device
 }
 
 void ethernet_packet(struct netdevice* dev, const uint8_t * data) {
     struct ethernet_frame *frame = (struct ethernet_frame*) data;
-    print_mac("\ndst: ", frame->destination);
-    print_mac(" src: ", frame->source);
     uint16_t type = ntos(frame->sizeOrType);
     if (type == 0x0800) {
-        ip_packet(data + sizeof(struct ethernet_frame));
+        ip_packet(dev, data + sizeof(struct ethernet_frame));
         return;
     }
     else if (type == 0x0806) {

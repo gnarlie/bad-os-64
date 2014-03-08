@@ -70,9 +70,9 @@ void* kmem_alloc(size_t size) {
         // FIXME .. this will never cross bitset boundry - so no allocation with
         // more than 32 chunks will *ever* work. We'll need test running end of
         // one chunk with the begging of the next
-        uint32_t mask = (1 << requiredChunks) - 1;
 
         for(uint32_t chunk = 0; chunk < block->nChunks; chunk++) {
+            uint32_t mask = (1 << requiredChunks) - 1;
             int nBits = sizeof(block->chunkMasks[0]) * 8 - requiredChunks + 1;
             for (int bit = 0; bit < nBits; bit++, mask <<= 1) {
                 if (test_bits(~block->chunkMasks[chunk], mask)) {
@@ -106,7 +106,6 @@ static void kmem_free_from_block(Block* block, AllocationHeader * header) {
     block->chunkMasks[chunkSet] &= ~mask;
 
     heap.currentObjects--;
-
 //    printf("chunks %d, sequence %d\n", header->chunks, header->sequence);
 //    printf("offset %x, chunk %x, mask %x, firstForChunk %p, header %p\n", offset, chunkSet, mask, firstForChunkSet, header);
 }

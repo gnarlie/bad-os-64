@@ -79,8 +79,8 @@ static void ne2k_irq(registers_t* regs, void * ptr) {
         if (frame == stop_page)
             frame = rx_start_page;
 
-        console_put_hex8(rxpage);
-        console_put_hex8(frame);
+        //console_put_hex8(rxpage);
+        //console_put_hex8(frame);
         //console_print_string(" ");
 
         while (rxpage != frame) {
@@ -105,9 +105,9 @@ static void ne2k_irq(registers_t* regs, void * ptr) {
             hdr.val = inl(self->iomem + 0x10);
             uint16_t size = hdr.header.count - sizeof(hdr);
 
-            console_print_string("status ");
-            console_put_hex8(hdr.header.status);
-            console_print_string(": ");
+            //console_print_string("\nstatus ");
+            //console_put_hex8(hdr.header.status);
+            //console_print_string(": ");
 
             outb(self->iomem, NoDma | Start);
             outb(REMSTARTADDRLO, 4);
@@ -122,6 +122,7 @@ static void ne2k_irq(registers_t* regs, void * ptr) {
                buffer[s] = d & 0xff;
                //console_put_hex8(buffer[s]);
                //console_put_hex8(buffer[s+1]);
+               //console_print_string(" ");
             }
             if (size & 1) {
                uint8_t d = inb(DATA);
@@ -133,6 +134,7 @@ static void ne2k_irq(registers_t* regs, void * ptr) {
 
             frame = hdr.header.next;
             outb(BOUNDRY, frame - 1);
+            kmem_free(buffer);
         }
 
         console_print_string("\n");
@@ -191,11 +193,13 @@ static void ne2k_send(struct netdevice * dev, const void*data, uint16_t size) {
     task_enqueue(dev->sendTask);
 }
 
+static uint32_t myIp = 0xC0A80302;
 static void initialize(uint8_t intr, uint32_t bar0) {
     struct netdevice * self = kmem_alloc(sizeof(struct netdevice));
     self = kmem_alloc(sizeof(struct netdevice));
     self->sendTask = task_alloc(send_sync, self);
     self->send = ne2k_send;
+    self->ip = myIp;
     add_ref(self->sendTask);
 
     self->iomem = bar0 & ~3;
@@ -229,6 +233,7 @@ static void initialize(uint8_t intr, uint32_t bar0) {
         mac[i] = inb(self->iomem + 0x10);
         if (i) console_print_string(":");
         console_put_hex8(mac[i]);
+        self->mac[i] = mac[i];
     }
     console_print_string("\n");
 
