@@ -19,7 +19,7 @@ int main(int argc, char**argv) {
 
     RUN(convertAll); rc |= TEST_REPORT();
 
-    RUN(ping);
+    RUN(icmp_ping_replied);
     RUN(checksums); rc |= TEST_REPORT();
 
     return rc;
