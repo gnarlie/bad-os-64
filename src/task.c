@@ -28,8 +28,8 @@ Task * task_alloc(tasklet callback, void * user) {
     return task;
 }
 
-void task_enqueue_easy(tasklet t) {
-    Task * task = task_alloc(t, 0);
+void task_enqueue_easy(tasklet t, void * user) {
+    Task * task = task_alloc(t, user);
     task_enqueue(task);
 }
 

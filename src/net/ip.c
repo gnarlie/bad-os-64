@@ -1,6 +1,7 @@
 #include "net/ip.h"
 #include "net/device.h"
 #include "net/ethernet.h" // TODO: remove
+#include "net/arp.h"
 #include "net/ntox.h"
 #include "net/sbuff.h"
 
@@ -30,11 +31,10 @@ static void console_put_ip(uint32_t ip) {
 }
 
 sbuff* ip_sbuff_alloc(uint16_t size) {
-    sbuff * p = raw_sbuff_alloc(size
-                    + sizeof(struct ethernet_frame)
+    sbuff * p = ethernet_sbuff_alloc(size
                     + sizeof(struct ipv4_header));
 
-    sbuff_push(p, sizeof(struct ethernet_frame) + sizeof(struct ipv4_header));
+    sbuff_push(p, sizeof(struct ipv4_header));
     return p;
 }
 
@@ -71,12 +71,6 @@ void icmp_segment(uint32_t sender, struct netdevice* dev, const uint8_t* data, u
     }
 }
 
-uint32_t arp_lookup(uint32_t ip, mac dest) {
-    //TODO ... actual ARP lookup
-    for(int i = 0;i < 6; i++)
-        dest[i] = 0xff;
-}
-
 void ip_send(sbuff* sbuff, uint8_t proto, uint32_t dest, struct netdevice* device) {
     sbuff_pop(sbuff, sizeof(struct ipv4_header));
     uint16_t len = sbuff->currSize;
@@ -96,9 +90,9 @@ void ip_send(sbuff* sbuff, uint8_t proto, uint32_t dest, struct netdevice* devic
     checksum(hdr, sizeof(*hdr), &hdr->checksum);
 
     static mac destMac;
-    arp_lookup(dest, destMac);
-
-    ethernet_send(sbuff, 0x0800u, destMac, device);
+    if (arp_lookup(device, dest, destMac)) {
+        ethernet_send(sbuff, 0x0800u, destMac, device);
+    }
 }
 
 void ip_packet(struct netdevice* dev, const uint8_t* data) {
@@ -110,7 +104,11 @@ void ip_packet(struct netdevice* dev, const uint8_t* data) {
                           data + hdrLen,
                           ntos(ip->total_len) - hdrLen);
                   break;
+        case(2) : warn("No habla igmp\n"); break;
+        case(6) : warn("No habla tcp\n"); break;
+        case(17) : warn("No habla udp\n"); break;
         default:
+            console_put_hex16(ip->proto);
             warn("Unsupported IP protocol");
     }
 }

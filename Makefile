@@ -16,7 +16,7 @@ test: bin/alltests
 
 .PHONY : test
 
-bin/alltests: $(TEST_OBJS) | $(filter-out out/entry.o out/panic.o out/main.o out/interrupt.o out/keyboard.o, $(OBJS))
+bin/alltests: $(TEST_OBJS) $(filter-out out/entry.o out/panic.o out/main.o out/interrupt.o out/keyboard.o, $(OBJS))
 	-mkdir -p bin/
 	$(CC) -o $@ $^ $|
 

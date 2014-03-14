@@ -7,6 +7,7 @@
 #include "task.h"
 
 #include "net/ethernet.h"
+#include "net/arp.h"
 #include "net/ntox.h"
 #include "net/device.h"
 
@@ -127,7 +128,7 @@ static void ne2k_irq(registers_t* regs, void * ptr) {
             if (size & 1) {
                uint8_t d = inb(DATA);
                buffer[size - 1] = d;
-               console_put_hex8(d);
+               //console_put_hex8(d);
             }
 
             ethernet_packet(self, buffer);
@@ -137,7 +138,7 @@ static void ne2k_irq(registers_t* regs, void * ptr) {
             kmem_free(buffer);
         }
 
-        console_print_string("\n");
+        //console_print_string("\n");
 
         outb(ISR, PacketReceived);
     }
@@ -186,10 +187,8 @@ static void ne2k_send(struct netdevice * dev, const void*data, uint16_t size) {
     nextSize = size;
     for(int i = 0; i < size; i++) {
         next[i] = ((const char*)data)[i];
-        //console_put_hex8(next[i]);
     }
 
-    //console_print_string("\n");
     task_enqueue(dev->sendTask);
 }
 
@@ -258,6 +257,8 @@ static void initialize(uint8_t intr, uint32_t bar0) {
     outb(IMR, ImrAllIsr);   // IMR enable everything
     outb(RCR, 0x1c);  // RCR: everything
     outb(TCR, 0x00);  // TCR - normal
+
+    gratuitous_arp(self);
 }
 
 void init_ne2k() {

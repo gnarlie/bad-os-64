@@ -11,7 +11,7 @@ typedef struct TaskT {
     struct TaskT* next;
 } Task;
 
-void task_enqueue_easy(tasklet task);
+void task_enqueue_easy(tasklet task, void * user);
 void task_enqueue(Task *);
 Task * task_alloc(tasklet task, void* user);
 

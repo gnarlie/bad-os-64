@@ -25,7 +25,7 @@ void irq_handler(uint8_t intNo, registers_t * regs) {
     }
     else {
         console_print_string("Stray IRQ ");
-        console_put_hex16(intNo);
+        console_put_hex8(intNo);
         console_print_string("\n");
     }
 }
