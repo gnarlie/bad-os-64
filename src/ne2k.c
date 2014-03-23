@@ -73,16 +73,13 @@ static void ne2k_irq(registers_t* regs, void * ptr) {
     }
 
     if (wtf & PacketReceived) {
+
         outb(self->iomem, NoDma | Page1);
         uint8_t rxpage = inb(CURPAGE);
         outb(self->iomem, NoDma | Start);
         uint8_t frame = inb(BOUNDRY) + 1;
         if (frame == stop_page)
             frame = rx_start_page;
-
-        //console_put_hex8(rxpage);
-        //console_put_hex8(frame);
-        //console_print_string(" ");
 
         while (rxpage != frame) {
 
@@ -106,10 +103,6 @@ static void ne2k_irq(registers_t* regs, void * ptr) {
             hdr.val = inl(self->iomem + 0x10);
             uint16_t size = hdr.header.count - sizeof(hdr);
 
-            //console_print_string("\nstatus ");
-            //console_put_hex8(hdr.header.status);
-            //console_print_string(": ");
-
             outb(self->iomem, NoDma | Start);
             outb(REMSTARTADDRLO, 4);
             outb(REMBCOUNTLO, size & 0xff);
@@ -121,14 +114,10 @@ static void ne2k_irq(registers_t* regs, void * ptr) {
                uint16_t d = inw(DATA);
                buffer[s+1] = d >> 8;
                buffer[s] = d & 0xff;
-               //console_put_hex8(buffer[s]);
-               //console_put_hex8(buffer[s+1]);
-               //console_print_string(" ");
             }
             if (size & 1) {
                uint8_t d = inb(DATA);
                buffer[size - 1] = d;
-               //console_put_hex8(d);
             }
 
             ethernet_packet(self, buffer);
@@ -137,8 +126,6 @@ static void ne2k_irq(registers_t* regs, void * ptr) {
             outb(BOUNDRY, frame - 1);
             kmem_free(buffer);
         }
-
-        //console_print_string("\n");
 
         outb(ISR, PacketReceived);
     }

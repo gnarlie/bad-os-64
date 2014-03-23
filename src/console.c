@@ -15,12 +15,6 @@ static char hex(int i) {
 }
 
 void scroll() {
-//    uint32_t esp;
-//    asm ("mov %%esp, %0" : "=r"(esp));
-//    for (int i = 28; i >= 0; i -= 4) {
-//        VideoStart[cols * 3 - i / 2 - 2] = hex((esp >> i) & 0xf );
-//    }
-
     for (uint16_t row = 0; row < lines - 1; row++) {
         for(uint16_t col = 0; col < cols; col++) {
             uint16_t pos = row * cols + col;
