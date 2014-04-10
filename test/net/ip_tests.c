@@ -2,24 +2,9 @@
 #include "net/arp.h"
 #include "net/device.h"
 #include "../tinytest.h"
+#include "tobytes.h"
 
 #include <string.h>
-
-static uint8_t fromhex(char c) {
-    if (c >= 'a' && c <= 'f') return 10 + c - 'a';
-    if (c >= 'A' && c <= 'F') return 10 + c - 'A';
-    return c - '0';
-}
-
-static uint8_t * tobytes(const char * s) {
-    int len = strlen(s) / 2;
-    uint8_t * ret = malloc(len);
-    for (int i = 0; i < len; i++) {
-        ret[i] = (fromhex(s[i*2]) << 4) + fromhex(s[i*2+1]);
-    }
-
-    return ret;
-}
 
 void checksums() {
     uint8_t * bytes = tobytes("450038000000000005010000c0a80302c0a80301");

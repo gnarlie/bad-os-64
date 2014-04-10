@@ -1,6 +1,7 @@
 #include "tinytest.h"
 
 void panic(const char * why) {
+    printf("PANIC %s\n", why);
     ASSERT(why, 0);
 }
 
@@ -18,6 +19,8 @@ int main(int argc, char**argv) {
     RUN(tasksDontDoubleQueue); rc |= TEST_REPORT();
 
     RUN(convertAll); rc |= TEST_REPORT();
+
+    RUN(udp_echo); rc |= TEST_REPORT();
 
     RUN(icmp_ping_replied);
     RUN(checksums); rc |= TEST_REPORT();

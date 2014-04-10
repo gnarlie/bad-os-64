@@ -8,6 +8,7 @@ struct sbuff_t;
 
 void ip_packet(struct netdevice* dev, const uint8_t* data);
 void ip_send(struct sbuff_t* sbuff, uint8_t proto, uint32_t dest, struct netdevice *);
+struct sbuff_t* ip_sbuff_alloc(uint16_t sz);
 
 static inline uint16_t checksum(const void *buf, uint32_t len, uint16_t* dest) {
     const uint8_t* data= (const char*)buf;

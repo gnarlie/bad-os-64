@@ -12,4 +12,4 @@ struct netdevice {
     uint32_t ip;
     mac mac;
     uint16_t iomem;
-};
+}; 

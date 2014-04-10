@@ -60,7 +60,7 @@ static inline void set_bit(uint8_t *p, int mask) {
 static char * kmem_block_start(Block* block) {
     return (char*)(block + 1) + block->nChunks / sizeof(block->chunkMasks[0]);
 }
-
+extern int printf(const char *, ...);
 void* kmem_alloc(size_t size) {
     size += sizeof(AllocationHeader);
     for (Block * block = heap.block; block; block = block->next) {
