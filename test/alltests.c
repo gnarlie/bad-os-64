@@ -22,6 +22,8 @@ int main(int argc, char**argv) {
 
     RUN(udp_echo); rc |= TEST_REPORT();
 
+    RUN(connection_refused); rc |= TEST_REPORT();
+
     RUN(icmp_ping_replied);
     RUN(checksums); rc |= TEST_REPORT();
 

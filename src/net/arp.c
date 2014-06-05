@@ -82,7 +82,7 @@ int arp_lookup(struct netdevice* dev, uint32_t ip, mac dest) {
     return 0;
 }
 
-static void store(mac dest, uint32_t ip) {
+void arp_store(mac dest, uint32_t ip) {
     table.ips[table.count] = ip;
     memcpy(table.macs[table.count], dest, 6);
 
@@ -102,7 +102,7 @@ void arp_packet(struct netdevice* dev, const uint8_t * data) {
         reply(dev, arp->senderMac, ntol(arp->senderIp), 0);
     }
     else {
-        store(arp->senderMac, ntol(arp->senderIp));
+        arp_store(arp->senderMac, ntol(arp->senderIp));
     }
 }
 

@@ -30,7 +30,7 @@ static void udp_send(sbuff * sb, uint16_t len,
     hdr->srcPort = ntos(srcPort);
     hdr->destPort = ntos(dstPort);
     hdr->len = ntos(len);
-    checksum(hdr, len, &hdr->chksum);
+    checksum(hdr, len, &hdr->chksum); // TODO udp checksum fix needed
 
     ip_send(sb, 17, dstIp, dev);
 }

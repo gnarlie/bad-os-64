@@ -6,6 +6,8 @@
 struct netdevice;
 struct sbuff_t;
 
+#define IPPROTO_TCP 6
+
 void ip_packet(struct netdevice* dev, const uint8_t* data);
 void ip_send(struct sbuff_t* sbuff, uint8_t proto, uint32_t dest, struct netdevice *);
 struct sbuff_t* ip_sbuff_alloc(uint16_t sz);

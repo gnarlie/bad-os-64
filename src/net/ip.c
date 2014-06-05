@@ -4,6 +4,7 @@
 #include "net/arp.h"
 #include "net/ntox.h"
 #include "net/udp.h"
+#include "net/tcp.h"
 #include "net/sbuff.h"
 
 #include "console.h"
@@ -106,7 +107,7 @@ void ip_packet(struct netdevice* dev, const uint8_t* data) {
                           ntos(ip->total_len) - hdrLen);
                   break;
         case(2) : warn("No habla igmp\n"); break;
-        case(6) : warn("No habla tcp\n"); break;
+        case(IPPROTO_TCP) : tcp_segment(dev, data + hdrLen, ntol(ip->src)); break;
         case(17) :
             udp_datagram(dev, data + hdrLen, ntol(ip->src));
             break;
