@@ -24,9 +24,9 @@ void irq_handler(uint8_t intNo, registers_t * regs) {
         handler(regs, interrupt_handlers[intNo].user);
     }
     else {
-        console_print_string("Stray IRQ ");
-        console_put_hex8(intNo);
-        console_print_string("\n");
+//        console_print_string("Stray IRQ ");
+//        console_put_hex8(intNo);
+//        console_print_string("\n");
     }
 }
 
