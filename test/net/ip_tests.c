@@ -7,11 +7,11 @@
 #include <string.h>
 
 void checksums() {
-    uint8_t * bytes = tobytes("450038000000000005010000c0a80302c0a80301");
+    uint8_t * bytes = tobytes("450038000000000000000000c0a80302c0a80301");
 
-    ASSERT_EQUALS(0xf6a9,
+    ASSERT_EQUALS(0xfbaa,
             checksum(bytes, 20, (uint16_t*)(bytes + 8)));
-    ASSERT_EQUALS(0xa9f6,
+    ASSERT_EQUALS(0xaafb,
             *(uint16_t*)(bytes + 8));
 
     free(bytes);
