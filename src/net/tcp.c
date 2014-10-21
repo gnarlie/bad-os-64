@@ -102,6 +102,7 @@ void connected(struct netdevice *dev,
     all_streams = s;
 
     header_from_stream(s, hdr, Syn | Ack);
+    s->localSeq++;
 
     tcp_checksum(sb, sizeof(*hdr), dev->ip, remoteAddr);
     ip_send(sb, IPPROTO_TCP, remoteAddr, dev);
@@ -117,10 +118,32 @@ static void acked(stream * stream, tcp_hdr* hdr) {
     }
 }
 
-static void pushit(struct netdevice* dev, tcp_hdr *hdr, stream * stream) {
-    const char * body = (const char*)hdr + 4 * hdr->offset;
+static void tcp_send(struct netdevice *dev, stream *stream, uint8_t* data, uint16_t sz) {
+    if (!sz) sz = strlen(data);
 
+    //Segmentation would be good ... rcv window size, etc., etc.
+
+    sbuff * sb = ip_sbuff_alloc(sizeof(tcp_hdr) + sz);
+    tcp_hdr * response = (tcp_hdr*) sb->head;
+    header_from_stream(stream, response, Psh);
+
+    uint8_t* dst = sb->head + sizeof(*response);
+    memcpy(dst, data, sz);
+
+    tcp_checksum(sb, sizeof(*response) + sz, dev->ip, stream->remoteAddr);
+    ip_send(sb, IPPROTO_TCP, stream->remoteAddr, dev);
+
+    stream->localSeq += sz;
+}
+
+static void pushit(struct netdevice* dev, tcp_hdr *hdr,
+        stream * stream, uint32_t len) {
+    stream->ackSeq = ntol(hdr->sequence) + len;
+
+    const char * body = (const char*)hdr + 4 * hdr->offset;
     console_print_string(body);
+
+    tcp_send(dev, stream, "HTTP/1.1 200 OK\r\nContent-Type: text/html\r\nContent-Length: 26\r\n\r\n<html>Bad-OS 64</html>\r\n\r\n", 0);
 }
 
 static stream * find(struct netdevice *local, uint32_t src, tcp_hdr* hdr) {
@@ -140,7 +163,7 @@ static stream * find(struct netdevice *local, uint32_t src, tcp_hdr* hdr) {
 }
 
 
-void tcp_segment(struct netdevice *dev, const uint8_t* data, uint32_t srcIp) {
+void tcp_segment(struct netdevice *dev, const uint8_t* data, uint32_t sz, uint32_t srcIp) {
     tcp_hdr * hdr = (tcp_hdr*)data;
 
     uint16_t dst = ntos(hdr->destPort);
@@ -170,7 +193,7 @@ void tcp_segment(struct netdevice *dev, const uint8_t* data, uint32_t srcIp) {
             reset_stream(dev, hdr, srcIp);
         }
         else {
-            pushit(dev, hdr, s);
+            pushit(dev, hdr, s, sz - hdr->offset * 4);
         }
     }
 }

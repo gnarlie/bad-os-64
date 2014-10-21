@@ -102,12 +102,19 @@ void ip_packet(struct netdevice* dev, const uint8_t* data) {
 
     uint16_t hdrLen = ip->ihl * 4;
     switch(ip->proto) {
-        case(1) : icmp_segment(ntol(ip->src), dev,
+        case(1) :
+            icmp_segment(ntol(ip->src), dev,
                           data + hdrLen,
                           ntos(ip->total_len) - hdrLen);
-                  break;
-        case(2) : warn("No habla igmp\n"); break;
-        case(IPPROTO_TCP) : tcp_segment(dev, data + hdrLen, ntol(ip->src)); break;
+            break;
+
+        case(2) :
+            warn("No habla igmp\n");
+            break;
+        case(IPPROTO_TCP) :
+            tcp_segment(dev, data + hdrLen,
+                    ntos(ip->total_len) - hdrLen, ntol(ip->src));
+            break;
         case(17) :
             udp_datagram(dev, data + hdrLen, ntol(ip->src));
             break;

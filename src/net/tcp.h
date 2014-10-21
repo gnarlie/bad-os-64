@@ -17,4 +17,4 @@ typedef struct tcp_hdr_t {
     uint32_t options[];
 } tcp_hdr;
 
-void tcp_segment(struct netdevice *dev, const uint8_t* data, uint32_t ip);
+void tcp_segment(struct netdevice *dev, const uint8_t* data, uint32_t size, uint32_t ip);

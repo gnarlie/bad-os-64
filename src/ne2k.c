@@ -180,6 +180,8 @@ static void ne2k_send(struct netdevice * dev, const void*data, uint16_t size) {
 }
 
 static uint32_t myIp = 0xC0A80302;
+static uint32_t gateway = 0xC0A80301;
+
 static void initialize(uint8_t intr, uint32_t bar0) {
     struct netdevice * self = kmem_alloc(sizeof(struct netdevice));
     self = kmem_alloc(sizeof(struct netdevice));
@@ -246,6 +248,7 @@ static void initialize(uint8_t intr, uint32_t bar0) {
     outb(TCR, 0x00);  // TCR - normal
 
     gratuitous_arp(self);
+    arp_lookup(self, gateway, NULL);
 }
 
 void init_ne2k() {

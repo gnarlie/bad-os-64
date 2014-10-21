@@ -43,3 +43,9 @@ void * memcpy(void * dest, const void * src, size_t n) {
     return dest;
 }
 
+size_t strlen(const char * what) {
+    const char * p = what;
+    for (; *p; ++p) ;
+    return p  - what;
+}
+

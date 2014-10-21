@@ -16,6 +16,8 @@ uint32_t inl(uint16_t port);
 void bzero(void * dest, size_t count);
 void *memcpy(void * dest, const void * src, size_t n);
 
+size_t strlen(const char * what);
+
 void panic(const char * why);
 void warn(const char * what);
 
@@ -23,3 +25,4 @@ void warn(const char * what);
 
 #define add_ref(thing) (thing)->refs++
 #define release_ref(thing, free) if (--(thing->refs) == 0) {free(thing);}
+
