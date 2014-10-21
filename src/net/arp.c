@@ -69,6 +69,7 @@ struct arp_table {
     uint16_t count;
 };
 
+extern int printf(const char*, ...);
 static struct arp_table table;
 int arp_lookup(struct netdevice* dev, uint32_t ip, mac dest) {
     for (int e = 0; e < table.count; e++) {
