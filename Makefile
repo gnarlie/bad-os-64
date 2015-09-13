@@ -48,4 +48,4 @@ clean:
 
 -include out/*.d
 
-.PHONY: run clean
+.PHONY: run clean default test

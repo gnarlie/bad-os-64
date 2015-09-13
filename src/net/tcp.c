@@ -6,6 +6,20 @@
 #include "memory.h"
 #include "console.h"
 
+typedef enum TcpState_t {
+    Closed,
+    Listen,
+    SynReceived,
+    SynSent,
+    Established,
+    FinWait1,
+    FinWait2,
+    Closing,
+    TimeWait,
+    CloseWait,
+    LastAck
+} TcpState;
+
 typedef struct stream_t {
     uint16_t localPort;
     uint32_t localAddr;
@@ -17,6 +31,8 @@ typedef struct stream_t {
     uint32_t ackSeq;
 
     uint8_t needsAck;
+
+    TcpState state;
 
     struct stream_t* next;
 
@@ -43,6 +59,20 @@ enum {
 };
 
 static stream * all_streams = NULL;
+
+static void remove_stream(stream * s) {
+    stream * before = all_streams;
+    while(before && before->next != s) {
+        before = before->next;
+    }
+
+    if (before)
+        before->next = s->next;
+    else
+        all_streams = s->next;
+
+    kmem_free(s);
+}
 
 static void tcp_checksum(sbuff *sb, uint16_t len, uint32_t src, uint32_t dest) {
     tcp_hdr * hdr = (tcp_hdr*) sb->head;
@@ -97,6 +127,7 @@ void connected(struct netdevice *dev,
     s->localSeq = localSeq;
     s->ackSeq = ackSeq + 1;
     s->needsAck = 1;
+    s->state = SynReceived;
 
     s->next = all_streams;
     all_streams = s;
@@ -109,18 +140,19 @@ void connected(struct netdevice *dev,
 }
 
 static void acked(stream * stream, tcp_hdr* hdr) {
-    if (hdr->ack > stream->pendingAck) {
+    if (hdr->ack >= stream->pendingAck) {
         stream->pendingAck = hdr->ack;
         // TODO: delete retransmit buffers here
     }
     else {
         // retransmit?
     }
+
+    if (stream->state == SynReceived) stream->state = Established;
+    if (stream->state == LastAck) remove_stream(stream);
 }
 
-static void tcp_send(struct netdevice *dev, stream *stream, uint8_t* data, uint16_t sz) {
-    if (!sz) sz = strlen(data);
-
+static void tcp_send(struct netdevice *dev, stream *stream, const uint8_t* data, uint16_t sz) {
     //Segmentation would be good ... rcv window size, etc., etc.
 
     sbuff * sb = ip_sbuff_alloc(sizeof(tcp_hdr) + sz);
@@ -143,8 +175,26 @@ static void pushit(struct netdevice* dev, tcp_hdr *hdr,
     const char * body = (const char*)hdr + 4 * hdr->offset;
     console_print_string(body);
 
-    tcp_send(dev, stream, "HTTP/1.1 200 OK\r\nContent-Type: text/html\r\nContent-Length: 26\r\n\r\n<html>Bad-OS 64</html>\r\n\r\n", 0);
+    const char* response =  "HTTP/1.1 200 OK\r\nContent-Type: text/html\r\nContent-Length: 26\r\n\r\n<html>Bad-OS 64</html>\r\n\r\n";
+    tcp_send(dev, stream, response, strlen(response));
 }
+
+static void fin(struct netdevice * dev, stream * s) {
+    // send a fin/ack ... we're assuming the 'application'
+    // has no more data, otherwise we'd need to Ack, wait for
+    // upper layer to shutdown/close, then Fin
+    stream * before;
+    sbuff * sb = ip_sbuff_alloc(sizeof(tcp_hdr));
+    tcp_hdr * response = (tcp_hdr*) sb->head;
+    s->ackSeq++;
+    header_from_stream(s, response, Fin | Ack);
+
+    tcp_checksum(sb, sizeof(*response), dev->ip, s->remoteAddr);
+    ip_send(sb, IPPROTO_TCP, s->remoteAddr, dev);
+    s->state = LastAck;
+
+}
+
 
 static stream * find(struct netdevice *local, uint32_t src, tcp_hdr* hdr) {
     stream * stream = all_streams;
@@ -162,7 +212,6 @@ static stream * find(struct netdevice *local, uint32_t src, tcp_hdr* hdr) {
     return NULL;
 }
 
-
 void tcp_segment(struct netdevice *dev, const uint8_t* data, uint32_t sz, uint32_t srcIp) {
     tcp_hdr * hdr = (tcp_hdr*)data;
 
@@ -177,23 +226,21 @@ void tcp_segment(struct netdevice *dev, const uint8_t* data, uint32_t sz, uint32
         }
     }
 
+    stream * s = find(dev, srcIp, hdr);
+    if (!s) {
+        reset_stream(dev, hdr, srcIp);
+        return;
+    }
+
     if (hdr->flags & Ack) {
-        stream * s = find(dev, srcIp, hdr);
-        if (s) {
-            acked(s, hdr);
-        }
-        else {
-            reset_stream(dev, hdr, srcIp);
-        }
+        acked(s, hdr);
     }
 
     if (hdr->flags & Psh) {
-        stream * s = find(dev, srcIp, hdr);
-        if ( !s) {
-            reset_stream(dev, hdr, srcIp);
-        }
-        else {
-            pushit(dev, hdr, s, sz - hdr->offset * 4);
-        }
+        pushit(dev, hdr, s, sz - hdr->offset * 4);
+    }
+
+    if (hdr->flags & Fin) {
+        fin(dev, s);
     }
 }

@@ -8,3 +8,4 @@ bin/
 kernel.sym
 tap.pcap
 tcpdump.pid
+.ycm_extra_conf.*
