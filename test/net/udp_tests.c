@@ -3,14 +3,16 @@
 #include "net/sbuff.h"
 #include "net/arp.h"
 #include "memory.h"
+#include "string.h"
 
 #include "../tinytest.h"
 
-const uint8_t * g_data = 0;
+uint8_t * g_data = 0;
 uint16_t g_len;
-static void capture(struct netdevice *dev, const void *ptr, uint16_t len) {
-    g_data = ptr;
-    g_len = len;
+static void capture(struct netdevice *dev, sbuff * sbuff) {
+    g_len = sbuff->totalSize;
+    g_data = malloc(g_len);
+    memcpy(g_data, sbuff->data, g_len);
 }
 
 
@@ -27,12 +29,13 @@ void udp_echo() {
     dev.ip = 0xC0A80302;
     dev.send = capture;
 
+    // seed arp
     arp_packet(&dev, arp);
     udp_datagram(&dev, request, 0xc0a80301);
 
-    ASSERT_EQUALS(54, g_len);
+    ASSERT_INT_EQUALS(54, g_len);
     for (int i = 0; i < g_len - 34; ++i) {
-        ASSERT_EQUALS(reply[i], g_data[i+34]);
+        ASSERT_INT_EQUALS(reply[i], g_data[i+34]);
     }
 
     free(arp);

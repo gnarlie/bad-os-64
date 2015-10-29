@@ -5,10 +5,10 @@
 typedef char mac[6];
 
 struct TaskT;
+struct sbuff_t;
 
 struct netdevice {
-    void (*send)(struct netdevice * self, const void*, uint16_t);
-    struct TaskT * sendTask;
+    void (*send)(struct netdevice * self, struct sbuff_t * sbuff);
     uint32_t ip;
     mac mac;
     uint16_t iomem;

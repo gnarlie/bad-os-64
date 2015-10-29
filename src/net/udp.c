@@ -34,7 +34,7 @@ static void udp_send(sbuff * sb, uint16_t len,
 
     ip_send(sb, 17, dstIp, dev);
 }
-
+extern int printf(const char *, ...);
 void udp_datagram(struct netdevice* dev, const uint8_t * data, uint32_t srcIp) {
     const udp_header * udp = (const udp_header*)data;
 

@@ -46,6 +46,7 @@
 #include <stdio.h>
 #include <stdbool.h>
 #include <stdlib.h>
+#include <stdarg.h>
 
 /* Main assertion method */
 #define ASSERT(msg, expression) if (!tt_assert(__FILE__, __LINE__, (msg), (#expression), (expression) ? true : false)) return
@@ -54,6 +55,7 @@
 /* TODO: Generate readable error messages for assert_equals or assert_str_equals */
 #define ASSERT_EQUALS(expected, actual) ASSERT((#actual), (expected) == (actual))
 #define ASSERT_STRING_EQUALS(expected, actual) ASSERT((#actual), strcmp((expected),(actual)) == 0)
+#define ASSERT_INT_EQUALS(expected, actual) ASSERT(to_str(#actual " is %d, expected", (actual)), (expected) == (actual))
 
 /* Run a test() function */
 #define RUN(test_function) extern void test_function(); tt_execute((#test_function), (test_function));
@@ -110,6 +112,17 @@ static int tt_report(void)
     tt_passes = tt_fails = 0;
     return 0;
   }
+}
+
+static const char * to_str(const char * fmt, ...)
+{
+    static char __thread buf[256];
+    va_list args;
+    va_start(args, fmt);
+    vsnprintf(buf,sizeof(buf), fmt, args);
+    va_end(args);
+
+    return buf;
 }
 
 #endif

@@ -27,7 +27,7 @@ void ethernet_send(sbuff* sbuff, uint16_t proto, mac dest, struct netdevice* dev
     assign(frame->source, device->mac);
     frame->sizeOrType = ntos(proto);
 
-    device->send(device, sbuff->head, sbuff->currSize);
+    device->send(device, sbuff);
 }
 
 sbuff * ethernet_sbuff_alloc(uint16_t size) {

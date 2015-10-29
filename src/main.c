@@ -133,4 +133,5 @@ void main() {
     update_task = task_alloc(update_clock, 0);
     add_ref(update_task);
     register_interrupt_handler(IRQ0, timer_irq, 0);
+
 }

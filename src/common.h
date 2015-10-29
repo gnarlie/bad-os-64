@@ -21,7 +21,9 @@ size_t strlen(const char * what);
 void panic(const char * why);
 void warn(const char * what);
 
+#ifndef NULL
 #define NULL ((void*)0)
+#endif
 
 #define add_ref(thing) (thing)->refs++
 #define release_ref(thing, free) if (--(thing->refs) == 0) {free(thing);}

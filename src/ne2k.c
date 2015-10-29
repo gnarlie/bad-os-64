@@ -64,6 +64,18 @@ static int tx_start_page = 0x40; // start of NE2000 buffer
 static int rx_start_page = 0x4c;
 static int stop_page = 0x80;     // end of NE2000 buffer
 
+struct recv_data {
+    struct netdevice * self;
+    uint8_t buffer[];
+};
+
+static void dispatch(void* user) {
+    struct recv_data *data = (struct recv_data*) user;
+    ethernet_packet(data->self, data->buffer);
+    kmem_free(data);
+}
+
+// TODO: * larger reads, DMA
 static void ne2k_irq(registers_t* regs, void * ptr) {
     struct netdevice* self = (struct netdevice*) ptr;
     uint8_t wtf = inb(ISR);
@@ -73,7 +85,6 @@ static void ne2k_irq(registers_t* regs, void * ptr) {
     }
 
     if (wtf & PacketReceived) {
-
         outb(self->iomem, NoDma | Page1);
         uint8_t rxpage = inb(CURPAGE);
         outb(self->iomem, NoDma | Start);
@@ -108,8 +119,11 @@ static void ne2k_irq(registers_t* regs, void * ptr) {
             outb(REMBCOUNTLO, size & 0xff);
             outb(REMBCOUNTHI, hdr.header.count >> 8);
 
+            struct recv_data * mem = kmem_alloc(size + sizeof(struct recv_data));
+            mem->self = self;
+            uint8_t * buffer = mem->buffer;
+
             // 16 bits at a time, up to a page (TODO handle larger reads)
-            uint8_t * buffer = kmem_alloc(size);
             for (uint16_t s = 0; s < size; s+=2) {
                uint16_t d = inw(DATA);
                buffer[s+1] = d >> 8;
@@ -120,11 +134,10 @@ static void ne2k_irq(registers_t* regs, void * ptr) {
                buffer[size - 1] = d;
             }
 
-            ethernet_packet(self, buffer);
+            task_enqueue_easy(dispatch, mem);
 
             frame = hdr.header.next;
             outb(BOUNDRY, frame - 1);
-            kmem_free(buffer);
         }
 
         outb(ISR, PacketReceived);
@@ -134,12 +147,22 @@ static void ne2k_irq(registers_t* regs, void * ptr) {
     outb(ISR, 0xff); // clear ISR
 }
 
-//TODO create linked list of pending sends
-static unsigned char next[2024];
-static uint16_t nextSize;
+struct PendingSend {
+    struct TaskT *task;
+    struct sbuff_t * data;
+    struct netdevice * dev;
+};
 
 static void send_sync(void * user) {
-    struct netdevice* self = (struct netdevice*)user;
+    struct PendingSend *send = (struct PendingSend*)user;
+    struct netdevice *self = send->dev;
+    uint16_t nextSize = send->data->currSize;
+    uint8_t* next = send->data->data;
+
+    console_print_string("send ");
+    console_put_dec((long)send->data);
+    console_print_string("\n");
+
     // stage
     outb(self->iomem, NoDma|Page0);
     outb(IMR, 0); // disable interrupts
@@ -148,13 +171,13 @@ static void send_sync(void * user) {
     outb(REMSTARTADDRLO, 0);
     outb(REMSTARTADDRHI, tx_start_page);
 
-    //console_print_string("\nSend: ");
+    console_print_string("\nSend: ");
     for(int i = 0; i < nextSize; i+=2) {
         uint16_t lo = next[i];
         uint16_t hi = next[i+1];
         uint16_t data = lo | hi << 8;
-        //console_put_hex16(ntos(data));
-        //console_print_string(" ");
+        console_put_hex16(ntos(data));
+        console_print_string(" ");
         outw(DATA, data);
     }
     if (nextSize % 2) outb(DATA, next[nextSize - 1]);
@@ -170,13 +193,18 @@ static void send_sync(void * user) {
     outb(self->iomem, NoDma|Transmit|Start);
 }
 
-static void ne2k_send(struct netdevice * dev, const void*data, uint16_t size) {
-    nextSize = size;
-    for(int i = 0; i < size; i++) {
-        next[i] = ((const char*)data)[i];
-    }
+static void ne2k_send(struct netdevice * dev, sbuff * sbuff) {
+    struct PendingSend *send = kmem_alloc(sizeof(struct PendingSend));
+    send->task = task_alloc(send_sync, send);
+    send->data = sbuff;
+    add_ref(send->data);
+    send->dev = dev;
 
-    task_enqueue(dev->sendTask);
+    console_print_string("enqueue ");
+    console_put_dec((long)sbuff);
+    console_print_string("\n");
+
+    task_enqueue(send->task);
 }
 
 static uint32_t myIp = 0xC0A80302;
@@ -185,10 +213,8 @@ static uint32_t gateway = 0xC0A80301;
 static void initialize(uint8_t intr, uint32_t bar0) {
     struct netdevice * self = kmem_alloc(sizeof(struct netdevice));
     self = kmem_alloc(sizeof(struct netdevice));
-    self->sendTask = task_alloc(send_sync, self);
     self->send = ne2k_send;
     self->ip = myIp;
-    add_ref(self->sendTask);
 
     self->iomem = bar0 & ~3;
     console_print_string("Found ne2k on IRQ ");

@@ -9,7 +9,9 @@
 
 static uint8_t * g_data = 0;
 uint16_t g_len;
-static void capture(struct netdevice *dev, const void *ptr, uint16_t len) {
+static void capture(struct netdevice *dev, sbuff* buff) {
+    size_t len = buff->totalSize;
+    const uint8_t* ptr = buff->data;
     g_data = malloc(len);
     memcpy(g_data, ptr, len);
     g_len = len;
@@ -44,11 +46,11 @@ void connection_synack() {
     arp_store(remote, 0xc0a80301);
     tcp_segment(&dev, syn.bytes, syn.len, 0xc0a80301);
 
-    ASSERT_EQUALS(54, g_len);
-    ASSERT_EQUALS(0x0008, *(uint16_t*)(g_data+12));
-    ASSERT_EQUALS(0x0203a8c0, *(uint32_t*)(g_data+26));
-    ASSERT_EQUALS(0x0103a8c0, *(uint32_t*)(g_data+30));
-    ASSERT_EQUALS(0x12, g_data[47]); // ack,syn
+    ASSERT_INT_EQUALS(54, g_len);
+    ASSERT_INT_EQUALS(0x0008, *(uint16_t*)(g_data+12));
+    ASSERT_INT_EQUALS(0x0203a8c0, *(uint32_t*)(g_data+26));
+    ASSERT_INT_EQUALS(0x0103a8c0, *(uint32_t*)(g_data+30));
+    ASSERT_INT_EQUALS(0x12, g_data[47]); // ack,syn
 }
 
 
