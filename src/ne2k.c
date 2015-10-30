@@ -159,10 +159,6 @@ static void send_sync(void * user) {
     uint16_t nextSize = send->data->currSize;
     uint8_t* next = send->data->data;
 
-    console_print_string("send ");
-    console_put_dec((long)send->data);
-    console_print_string("\n");
-
     // stage
     outb(self->iomem, NoDma|Page0);
     outb(IMR, 0); // disable interrupts
@@ -171,13 +167,13 @@ static void send_sync(void * user) {
     outb(REMSTARTADDRLO, 0);
     outb(REMSTARTADDRHI, tx_start_page);
 
-    console_print_string("\nSend: ");
+    //console_print_string("\nSend: ");
     for(int i = 0; i < nextSize; i+=2) {
         uint16_t lo = next[i];
         uint16_t hi = next[i+1];
         uint16_t data = lo | hi << 8;
-        console_put_hex16(ntos(data));
-        console_print_string(" ");
+        //console_put_hex16(ntos(data));
+        //console_print_string(" ");
         outw(DATA, data);
     }
     if (nextSize % 2) outb(DATA, next[nextSize - 1]);
@@ -200,10 +196,6 @@ static void ne2k_send(struct netdevice * dev, sbuff * sbuff) {
     add_ref(send->data);
     send->dev = dev;
 
-    console_print_string("enqueue ");
-    console_put_dec((long)sbuff);
-    console_print_string("\n");
-
     task_enqueue(send->task);
 }
 
@@ -217,9 +209,7 @@ static void initialize(uint8_t intr, uint32_t bar0) {
     self->ip = myIp;
 
     self->iomem = bar0 & ~3;
-    console_print_string("Found ne2k on IRQ ");
-    console_put_dec(intr);
-    console_print_string("\n");
+    console_print_string("Found ne2k on IRQ %d\n", intr);
 
     outb(self->iomem, NoDma|Stop);
     outb(DCR, 0x49);  // DCR -> BYTEXFR|NOLOOP|WORD

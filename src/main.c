@@ -103,12 +103,8 @@ void main() {
     kmem_init();
 
     uint32_t ram = *(uint32_t*)0x5020;
-    console_print_string("System RAM: ");
-    console_put_dec(ram);
-    console_print_string("MB. CPU Speed ");
     uint16_t cpuSpeed = *(uint16_t*)0x5010;
-    console_put_dec(cpuSpeed);
-    console_print_string("MHz \n");
+    console_print_string("System RAM: %d MB. CPU Speed: %d MHz\n", ram, cpuSpeed);
 
     // need to make these less arbiratry, based on the
     // actual memory map

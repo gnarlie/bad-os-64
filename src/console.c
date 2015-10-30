@@ -1,3 +1,4 @@
+#include "console.h"
 #include "common.h"
 
 static char * const VideoStart = (char *) 0xB8000;
@@ -83,10 +84,28 @@ void console_clear_screen() {
     set_cursor();
 }
 
-void console_print_string(const char * str) {
+void console_print_string(const char * str, ...) {
+    __builtin_va_list args;
+    __builtin_va_start(args, str);
     while (*str) {
-        console_put(*str++);
+        if( *str == '%') {
+            switch (*++str) {
+                case('d'):
+                    console_put_dec(__builtin_va_arg( args, uint32_t ));
+                    break;
+                case('x'):
+                    console_put_hex(__builtin_va_arg( args, uint32_t ));
+                    break;
+                default:
+                    console_put(*str);
+            }
+            str++;
+        }
+        else
+            console_put(*str++);
     }
+
+    __builtin_va_end(args);
 }
 
 void console_put_hex8(uint8_t v) {
