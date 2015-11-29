@@ -35,11 +35,17 @@ void connection_refused() {
     ASSERT_EQUALS(0x14, g_data[47]); // ack,rst
 }
 
+static tcp_read_fn accept() {
+    return NULL;
+}
+
 void connection_synack() {
     struct BytesLen syn;
     syn = tobyteslen("c7780050ee75886200000000a00272109ec30000020405b40402080a04316d060000000001030307");
     struct netdevice dev;
     dev.ip = 0xC0A80302;
+
+    listen(80, accept);
 
     dev.send = capture;
     mac remote = {1,2,3,4,5,6};

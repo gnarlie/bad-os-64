@@ -4,6 +4,7 @@
 #include "net/ntox.h"
 #include "net/ip.h"
 #include "memory.h"
+#include "errno.h"
 #include "console.h"
 
 typedef enum TcpState_t {
@@ -21,6 +22,8 @@ typedef enum TcpState_t {
 } TcpState;
 
 typedef struct stream_t {
+    struct netdevice * dev;
+
     uint16_t localPort;
     uint32_t localAddr;
     uint16_t remotePort;
@@ -35,6 +38,11 @@ typedef struct stream_t {
     TcpState state;
 
     struct stream_t* next;
+    uint8_t *read_buf;
+    uint32_t read_offset;
+    uint32_t read_max;
+
+    tcp_read_fn read_fn;
 
 } stream;
 
@@ -58,7 +66,15 @@ enum {
     Ns = 0x100
 };
 
+
+typedef struct listen_state_t {
+    uint16_t port;
+    tcp_read_fn (*accept)();
+    struct listen_state_t * next;
+} listen_state;
+
 static stream * all_streams = NULL;
+static listen_state * all_listeners;
 
 static void remove_stream(stream * s) {
     stream * before = all_streams;
@@ -98,8 +114,8 @@ static void header_from_stream(stream* stream, tcp_hdr* hdr, uint8_t flags) {
     hdr->chksum = 0;
 }
 
-void reset_stream(struct netdevice *dev, tcp_hdr* hdr, uint32_t srcIp) {
-    stream stream = {ntos(hdr->destPort), ntol(dev->ip),
+static void reset_stream(struct netdevice *dev, tcp_hdr* hdr, uint32_t srcIp) {
+    stream stream = {dev, ntos(hdr->destPort), ntol(dev->ip),
                      ntos(hdr->srcPort), srcIp,
                      0, 0, 0, 1 };
     sbuff * sb = ip_sbuff_alloc(sizeof(tcp_hdr));
@@ -111,15 +127,17 @@ void reset_stream(struct netdevice *dev, tcp_hdr* hdr, uint32_t srcIp) {
     ip_send(sb, IPPROTO_TCP, srcIp, dev);
 }
 
-void connected(struct netdevice *dev,
+static void connected(struct netdevice *dev,
         uint16_t localPort, uint16_t remotePort,
-        uint32_t remoteAddr, uint32_t ackSeq) {
+        uint32_t remoteAddr, uint32_t ackSeq, tcp_read_fn fn) {
     uint32_t localSeq = 1;
+    const uint32_t MaxReadBufffer = 2048;
 
     sbuff * sb = ip_sbuff_alloc(sizeof(tcp_hdr));
     tcp_hdr * hdr = (tcp_hdr*) sb->head;
 
-    stream * s = kmem_alloc(sizeof(stream));
+    stream * s = kmem_alloc(sizeof(stream) + MaxReadBufffer);
+    s->dev = dev;
     s->localPort = localPort;
     s->remotePort = remotePort;
     s->localAddr = dev->ip;
@@ -128,6 +146,11 @@ void connected(struct netdevice *dev,
     s->ackSeq = ackSeq + 1;
     s->needsAck = 1;
     s->state = SynReceived;
+
+    s->read_fn = fn;
+    s->read_buf = (void*)(s + 1);
+    s->read_offset = 0;
+    s->read_max = MaxReadBufffer;
 
     s->next = all_streams;
     all_streams = s;
@@ -152,7 +175,7 @@ static void acked(stream * stream, tcp_hdr* hdr) {
     if (stream->state == LastAck) remove_stream(stream);
 }
 
-static void tcp_send(struct netdevice *dev, stream *stream, const uint8_t* data, uint16_t sz) {
+void tcp_send(stream *stream, const void* data, uint16_t sz) {
     //Segmentation would be good ... rcv window size, etc., etc.
 
     sbuff * sb = ip_sbuff_alloc(sizeof(tcp_hdr) + sz);
@@ -162,21 +185,33 @@ static void tcp_send(struct netdevice *dev, stream *stream, const uint8_t* data,
     uint8_t* dst = sb->head + sizeof(*response);
     memcpy(dst, data, sz);
 
-    tcp_checksum(sb, sizeof(*response) + sz, dev->ip, stream->remoteAddr);
-    ip_send(sb, IPPROTO_TCP, stream->remoteAddr, dev);
+    tcp_checksum(sb, sizeof(*response) + sz, stream->dev->ip, stream->remoteAddr);
+    ip_send(sb, IPPROTO_TCP, stream->remoteAddr, stream->dev);
 
     stream->localSeq += sz;
 }
 
+static void buffer_data(struct netdevice* dev, tcp_hdr *hdr,
+        stream * stream, uint32_t len) {
+    if (stream->read_offset + len > stream->read_max) {
+        console_print_string("Out of buffer space in read ... dropping packet\n");
+        return;
+    }
+
+    stream->ackSeq = ntol(hdr->sequence) + len;
+    const uint8_t* data = (const uint8_t*)hdr + 4 * hdr->offset;
+    memcpy(stream->read_buf + stream->read_offset, data, len);
+    stream->read_offset += len;
+}
+
 static void pushit(struct netdevice* dev, tcp_hdr *hdr,
         stream * stream, uint32_t len) {
-    stream->ackSeq = ntol(hdr->sequence) + len;
+    stream->read_fn(stream, (const uint8_t*)hdr + 4 * hdr->offset, len);
 
-    const char * body = (const char*)hdr + 4 * hdr->offset;
-    console_print_string(body);
-
-    const char* response =  "HTTP/1.1 200 OK\r\nContent-Type: text/html\r\nContent-Length: 26\r\n\r\n<html>Bad-OS 64</html>\r\n\r\n";
-    tcp_send(dev, stream, response, strlen(response));
+//    console_print_string(body);
+//
+//    const char* response =  "HTTP/1.1 200 OK\r\nContent-Type: text/html\r\nContent-Length: 26\r\n\r\n<html>Bad-OS 64</html>\r\n\r\n";
+//    tcp_send(stream, response, strlen(response));
 }
 
 static void fin(struct netdevice * dev, stream * s) {
@@ -195,7 +230,6 @@ static void fin(struct netdevice * dev, stream * s) {
 
 }
 
-
 static stream * find(struct netdevice *local, uint32_t src, tcp_hdr* hdr) {
     stream * stream = all_streams;
     while( stream ) {
@@ -212,18 +246,45 @@ static stream * find(struct netdevice *local, uint32_t src, tcp_hdr* hdr) {
     return NULL;
 }
 
+static void syn(struct netdevice * dev, tcp_hdr *hdr, uint32_t srcIp) {
+    uint16_t dst = ntos(hdr->destPort);
+
+    listen_state * l = all_listeners;
+    while(l) {
+        if (l->port == dst) break;
+        l = l->next;
+    }
+
+    if (l == NULL) {
+        reset_stream(dev, hdr, srcIp);
+    }
+    else {
+        tcp_read_fn fn = l->accept();
+        connected(dev, dst, ntos(hdr->srcPort), srcIp, ntol(hdr->sequence), fn);
+    }
+}
+
+int listen(uint16_t port, tcp_read_fn (*accept)()) {
+    listen_state * l = all_listeners;
+    while(l) {
+        if (l->port == port) return EADDRINUSE;
+        l = l->next;
+    }
+
+    l = kmem_alloc(sizeof(listen_state));
+    l->next = all_listeners;
+    all_listeners = l;
+    l->port = port;
+    l->accept = accept;
+
+    return EOK;
+}
+
 void tcp_segment(struct netdevice *dev, const uint8_t* data, uint32_t sz, uint32_t srcIp) {
     tcp_hdr * hdr = (tcp_hdr*)data;
 
-    uint16_t dst = ntos(hdr->destPort);
     if (hdr->flags & Syn) {
-        // are we listening on that port?
-        if (dst != 80) {
-            reset_stream(dev, hdr, srcIp);
-        }
-        else {
-            connected(dev, dst, ntos(hdr->srcPort), srcIp, ntol(hdr->sequence) );
-        }
+        syn(dev, hdr, srcIp);
     }
 
     stream * s = find(dev, srcIp, hdr);
@@ -235,6 +296,8 @@ void tcp_segment(struct netdevice *dev, const uint8_t* data, uint32_t sz, uint32
     if (hdr->flags & Ack) {
         acked(s, hdr);
     }
+
+    buffer_data(dev, hdr, s, sz - hdr->offset * 4);
 
     if (hdr->flags & Psh) {
         pushit(dev, hdr, s, sz - hdr->offset * 4);

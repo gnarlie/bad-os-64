@@ -7,6 +7,7 @@
 #include "task.h"
 #include "pci.h"
 #include "ne2k.h"
+#include "service/http.h"
 
 void dump_regs(registers_t* regs) {
     console_print_string("rax "); console_put_hex64(regs->rax);
@@ -130,4 +131,5 @@ void main() {
     add_ref(update_task);
     register_interrupt_handler(IRQ0, timer_irq, 0);
 
+    init_http();
 }

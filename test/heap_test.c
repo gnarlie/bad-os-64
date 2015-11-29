@@ -2,8 +2,8 @@
 #include "tinytest.h"
 
 void simpleAllocation() {
-    void * block = malloc(1024*1024);
-    kmem_add_block((uint64_t)block, 1024*1024, 0x100);
+    void * block = malloc(48*1024*1024);
+    kmem_add_block((uint64_t)block, 48*1024*1024, 0x100);
 
     void * m1 = kmem_alloc(64),
          * m2 = kmem_alloc(333),

@@ -49,11 +49,11 @@ void kmem_init() {
     heap.currentObjects = 0;
 }
 
-static inline int test_bits(uint8_t p, int mask) {
+static inline int test_bits(uint32_t p, uint32_t mask) {
     return (mask & p) == mask;
 }
 
-static inline void set_bit(uint8_t *p, int mask) {
+static inline void set_bit(uint32_t *p, uint32_t mask) {
     *p |= mask;
 }
 
