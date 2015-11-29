@@ -96,6 +96,9 @@ void console_print_string(const char * str, ...) {
                 case('x'):
                     console_put_hex(__builtin_va_arg( args, uint32_t ));
                     break;
+                case('p'):
+                    console_put_hex64(__builtin_va_arg( args, uint64_t ));
+                    break;
                 default:
                     console_put(*str);
             }

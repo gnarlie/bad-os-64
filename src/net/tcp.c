@@ -22,11 +22,12 @@ typedef enum TcpState_t {
 } TcpState;
 
 typedef struct stream_t {
+    struct stream_t *next;
     struct netdevice * dev;
 
     uint16_t localPort;
-    uint32_t localAddr;
     uint16_t remotePort;
+    uint32_t localAddr;
     uint32_t remoteAddr;
 
     uint32_t localSeq;
@@ -37,7 +38,6 @@ typedef struct stream_t {
 
     TcpState state;
 
-    struct stream_t* next;
     uint8_t *read_buf;
     uint32_t read_offset;
     uint32_t read_max;
@@ -74,7 +74,7 @@ typedef struct listen_state_t {
 } listen_state;
 
 static stream * all_streams = NULL;
-static listen_state * all_listeners;
+static listen_state * all_listeners = NULL;
 
 static void remove_stream(stream * s) {
     stream * before = all_streams;
@@ -109,13 +109,13 @@ static void header_from_stream(stream* stream, tcp_hdr* hdr, uint8_t flags) {
     hdr->ack = ntol(stream->ackSeq);
     hdr->offset = 5;
     hdr->reserved = 0;
-    hdr->window = 12000;
+    hdr->window = ntos(12000);
     hdr->flags = flags | (stream->needsAck ? Ack : 0);
     hdr->chksum = 0;
 }
 
 static void reset_stream(struct netdevice *dev, tcp_hdr* hdr, uint32_t srcIp) {
-    stream stream = {dev, ntos(hdr->destPort), ntol(dev->ip),
+    stream stream = {0, dev, ntos(hdr->destPort), ntol(dev->ip),
                      ntos(hdr->srcPort), srcIp,
                      0, 0, 0, 1 };
     sbuff * sb = ip_sbuff_alloc(sizeof(tcp_hdr));
@@ -193,33 +193,29 @@ void tcp_send(stream *stream, const void* data, uint16_t sz) {
 
 static void buffer_data(struct netdevice* dev, tcp_hdr *hdr,
         stream * stream, uint32_t len) {
+    if (!len) return;
+
     if (stream->read_offset + len > stream->read_max) {
         console_print_string("Out of buffer space in read ... dropping packet\n");
         return;
     }
 
     stream->ackSeq = ntol(hdr->sequence) + len;
+
     const uint8_t* data = (const uint8_t*)hdr + 4 * hdr->offset;
     memcpy(stream->read_buf + stream->read_offset, data, len);
     stream->read_offset += len;
 }
 
-static void pushit(struct netdevice* dev, tcp_hdr *hdr,
-        stream * stream, uint32_t len) {
+static void pushit(stream * stream) {
     stream->read_fn(stream, stream->read_buf, stream->read_offset);
     stream->read_offset = 0;
-
-//    console_print_string(body);
-//
-//    const char* response =  "HTTP/1.1 200 OK\r\nContent-Type: text/html\r\nContent-Length: 26\r\n\r\n<html>Bad-OS 64</html>\r\n\r\n";
-//    tcp_send(stream, response, strlen(response));
 }
 
 static void fin(struct netdevice * dev, stream * s) {
     // send a fin/ack ... we're assuming the 'application'
     // has no more data, otherwise we'd need to Ack, wait for
     // upper layer to shutdown/close, then Fin
-    stream * before;
     sbuff * sb = ip_sbuff_alloc(sizeof(tcp_hdr));
     tcp_hdr * response = (tcp_hdr*) sb->head;
     s->ackSeq++;
@@ -228,7 +224,6 @@ static void fin(struct netdevice * dev, stream * s) {
     tcp_checksum(sb, sizeof(*response), dev->ip, s->remoteAddr);
     ip_send(sb, IPPROTO_TCP, s->remoteAddr, dev);
     s->state = LastAck;
-
 }
 
 static stream * find(struct netdevice *local, uint32_t src, tcp_hdr* hdr) {
@@ -301,7 +296,7 @@ void tcp_segment(struct netdevice *dev, const uint8_t* data, uint32_t sz, uint32
     buffer_data(dev, hdr, s, sz - hdr->offset * 4);
 
     if (hdr->flags & Psh) {
-        pushit(dev, hdr, s, sz - hdr->offset * 4);
+        pushit(s);
     }
 
     if (hdr->flags & Fin) {

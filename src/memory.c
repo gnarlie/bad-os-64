@@ -1,5 +1,6 @@
 #include "common.h"
 #include "memory.h"
+#include "console.h"
 
 typedef struct BlockT {
     struct BlockT * next;
@@ -35,7 +36,7 @@ void kmem_add_block(uint64_t start, uint64_t size, size_t chunkSize) {
     newb->chunkSize = chunkSize;
 
     newb->nChunks = newb->size / newb->chunkSize;
-    if (newb->nChunks * newb->chunkSize < newb->size) newb->nChunks++;
+    // if (newb->nChunks * newb->chunkSize < newb->size) newb->nChunks++;
 
     size_t maskSize = sizeof(newb->chunkMasks[0]);
     newb->nChunks = (newb->nChunks / maskSize) * maskSize;
@@ -57,8 +58,13 @@ static inline void set_bit(uint32_t *p, uint32_t mask) {
     *p |= mask;
 }
 
+static char * align8(char * p) {
+    long pint = (long)p;
+    return p + 8 - pint % 8;
+}
+
 static char * kmem_block_start(Block* block) {
-    return (char*)(block + 1) + block->nChunks / sizeof(block->chunkMasks[0]);
+    return align8((char*)(block + 1) + block->nChunks / sizeof(block->chunkMasks[0]));
 }
 
 extern int printf(const char *, ...);
@@ -79,8 +85,9 @@ void* kmem_alloc(size_t size) {
                 if (test_bits(~block->chunkMasks[chunk], mask)) {
                     block->chunkMasks[chunk] |= mask;
 
-                    size_t offset = block->chunkSize * (chunk * 8 + bit);
+                    size_t offset = block->chunkSize * (chunk * 8 * sizeof(block->chunkMasks[0]) + bit);
                     char *memory = kmem_block_start(block) + offset;
+                    // console_print_string("alloc %d %d %d %d %p\n", offset, block->chunkSize, chunk, bit, memory);
                     ((AllocationHeader*)memory)->chunks = requiredChunks;
                     ((AllocationHeader*)memory)->sequence = heap.sequence++;
                     heap.currentObjects ++;
