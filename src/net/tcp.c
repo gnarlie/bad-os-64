@@ -206,7 +206,8 @@ static void buffer_data(struct netdevice* dev, tcp_hdr *hdr,
 
 static void pushit(struct netdevice* dev, tcp_hdr *hdr,
         stream * stream, uint32_t len) {
-    stream->read_fn(stream, (const uint8_t*)hdr + 4 * hdr->offset, len);
+    stream->read_fn(stream, stream->read_buf, stream->read_offset);
+    stream->read_offset = 0;
 
 //    console_print_string(body);
 //
