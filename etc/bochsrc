@@ -12,3 +12,4 @@ ne2k: ioaddr=0x300, irq=9, mac=b0:c4:20:00:00:00, enabled=1, ethmod=tuntap, ethd
 pci: slot3=ne2k
 #debug: action=report
 #magic_break: enabled=1
+com1: enabled=1, mode=file, dev=serial.out

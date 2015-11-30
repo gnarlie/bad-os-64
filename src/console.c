@@ -1,5 +1,6 @@
 #include "console.h"
 #include "common.h"
+#include "serial.h"
 
 static char * const VideoStart = (char *) 0xB8000;
 static char *current = (char*) 0xB8000;
@@ -50,6 +51,7 @@ void set_cursor() {
 }
 
 void console_put(char c) {
+    serial_put(COM1, c);
     switch(c) {
         case('\n'):
             current += cols;
