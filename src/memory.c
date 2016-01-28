@@ -63,6 +63,10 @@ static char * align8(char * p) {
     return p + 8 - pint % 8;
 }
 
+/**
+ * returns a ptr to the first usable part of the structure, just past the
+ * chunk masks
+ */
 static char * kmem_block_start(Block* block) {
     return align8((char*)(block + 1) + block->nChunks / sizeof(block->chunkMasks[0]));
 }
@@ -87,7 +91,7 @@ void* kmem_alloc(size_t size) {
 
                     size_t offset = block->chunkSize * (chunk * 8 * sizeof(block->chunkMasks[0]) + bit);
                     char *memory = kmem_block_start(block) + offset;
-                    // console_print_string("alloc %d %d %d %d %p\n", offset, block->chunkSize, chunk, bit, memory);
+                    //printf("alloc %ld %d %d %d %p\n", offset, block->chunkSize, chunk, bit, memory);
                     ((AllocationHeader*)memory)->chunks = requiredChunks;
                     ((AllocationHeader*)memory)->sequence = heap.sequence++;
                     heap.currentObjects ++;
@@ -102,20 +106,18 @@ void* kmem_alloc(size_t size) {
     return NULL; //todo teach gcc that panic is one-way
 }
 
-// void printf(const char *, ...);
-
 static void kmem_free_from_block(Block* block, AllocationHeader * header) {
     size_t offset = (char*)header - kmem_block_start(block);
-    uint32_t chunkSet = (offset / block->chunkSize) / sizeof(block->chunkMasks[0]);
-    char* firstForChunkSet = kmem_block_start(block) + sizeof(block->chunkMasks[0]) * block->nChunks;
+    uint32_t chunkSet = (offset / block->chunkSize) / (sizeof(block->chunkMasks[0]));
+    char* firstForChunkSet = kmem_block_start(block) + 8 * sizeof(block->chunkMasks[0]) * chunkSet;
     uint32_t shift = ((char*)header - firstForChunkSet) / block->chunkSize;
 
     uint32_t mask = ((1 << header->chunks) - 1) << shift;
     block->chunkMasks[chunkSet] &= ~mask;
 
     heap.currentObjects--;
-//    printf("chunks %d, sequence %d\n", header->chunks, header->sequence);
-//    printf("offset %x, chunk %x, mask %x, firstForChunk %p, header %p\n", offset, chunkSet, mask, firstForChunkSet, header);
+    //printf("chunks %d, sequence %d\n", header->chunks, header->sequence);
+    //printf("offset %lx, chunk %x, mask %x, shift %x, firstForChunk %p, header %ld\n", offset, chunkSet, mask, shift, firstForChunkSet, 0l);
 }
 
 void kmem_free(void *ptr) {
