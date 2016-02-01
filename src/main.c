@@ -97,9 +97,61 @@ void timer_irq(registers_t* regs, void*user) {
     task_enqueue(update_task);
 }
 
+struct gdt_entry {
+    uint16_t lowLimit;
+    uint16_t baseLow;
+    uint8_t baseMid;
+    uint8_t type : 4;        // segment type
+    uint8_t descType : 1;    // 0 system, 1 code/data
+    uint8_t privLvl : 2;
+    uint8_t present : 1;
+    uint8_t segLimit : 4;
+    uint8_t available : 1;
+    uint8_t l : 1;           // 64 bit segment
+    uint8_t db : 1;          // lots of crappe
+    uint8_t granularity : 1; // 0: bytes, 1 4KB
+    uint8_t baseHigh;
+} __attribute__((packed));
+
+/****
+ * Starting with the boot loader's GDT, which is good enough for kernel
+ * operation - extend to allow user mode
+ */
+
+static void init_gdt() {
+    extern void install_gdt(void*, uint16_t);
+
+    struct gdt_entry gdt[5];
+    bzero(gdt, sizeof(gdt));
+
+    // gdt[0] is null selector ... leave 0's
+
+    // gdt[1] is kernel code
+    gdt[1].granularity = 0;
+    gdt[1].l = 1;
+    gdt[1].present = 1;
+    gdt[1].descType = 1;
+    gdt[1].type = 0xA; // execute / read
+
+    // gdt[2] is kernel data
+    gdt[2] = gdt[1];
+    gdt[2].type = 2;  // read / write
+
+    // gdt[3] is user code
+    gdt[3] = gdt[1];
+    gdt[3].privLvl = 3;
+
+    // gdt[4] is user data
+    gdt[4] = gdt[2];
+    gdt[4].privLvl = 3;
+
+    install_gdt(gdt, sizeof(struct gdt_entry) * 5);
+}
+
 void main() {
     console_print_string("Hello from C\n");
     init_interrupts();
+    init_gdt();
 
     kmem_init();
 
@@ -111,13 +163,13 @@ void main() {
     // actual memory map
     kmem_add_block(0x200000, 1024*1024*1024, 0x400);
 
+    register_interrupt_handler(3, breakpoint, 0);
+    register_interrupt_handler(0xd, protection, 0);
+
     init_pci();
     init_ne2k();
 
     init_keyboard();
-    register_interrupt_handler(3, breakpoint, 0);
-    register_interrupt_handler(0xd, protection, 0);
-
     // try a breakpoint
 //    uint64_t here;
 //    asm volatile ("lea (%%rip), %0" : "=r" (here) );

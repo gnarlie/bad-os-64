@@ -6,6 +6,7 @@ USE64
 [EXTERN console_clear_screen]
 [EXTERN console_print_string]
 [EXTERN console_put_hex]
+[EXTERN console_put_hex64]
 [EXTERN task_poll_for_work]
 [EXTERN panic]
 
@@ -14,6 +15,7 @@ USE64
 [GLOBAL create_isr_handler]
 [GLOBAL main_loop]
 [GLOBAL halt]
+[GLOBAL install_gdt]
 
 
 start:
@@ -35,6 +37,21 @@ main_loop:
 stack_slam:
     mov rdi, stack_differs
     call console_print_string
+    mov esp, [lastStack]
+    jmp main_loop
+
+; rdi - data to be copied
+; esi - size of data in bytes
+install_gdt:
+    mov ecx, esi
+    dec esi
+    mov word [gdtr64], si
+	mov rsi, rdi
+	mov rdi, 0x00001000		; GDT address
+    mov [gdtr64+2], rdi     ; stor in GDTR
+	rep movsb			    ; copy to here
+	lgdt [gdtr64]
+    ret
 
 create_gate:
     mov rax, rsi
@@ -213,3 +230,5 @@ ISR 31
 lastStack     dq 0
 stack_differs db `Stack pointer has changed\n`, 0
 hello_message db `Hello, World\n`, 0
+gdtr64        dw 0
+              dq 0x0000000000001000
