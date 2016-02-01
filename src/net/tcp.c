@@ -38,11 +38,11 @@ typedef struct stream_t {
 
     TcpState state;
 
-    uint8_t *read_buf;
-    uint32_t read_offset;
-    uint32_t read_max;
+    uint8_t *readBuf;
+    uint32_t readOffset;
+    uint32_t readMax;
 
-    tcp_read_fn read_fn;
+    tcp_read_fn readFn;
 
 } stream;
 
@@ -109,7 +109,7 @@ static void header_from_stream(stream* stream, tcp_hdr* hdr, uint8_t flags) {
     hdr->ack = ntol(stream->ackSeq);
     hdr->offset = 5;
     hdr->reserved = 0;
-    hdr->window = ntos(12000);
+    hdr->window = ntos(stream->readMax - stream->readOffset);
     hdr->flags = flags | (stream->needsAck ? Ack : 0);
     hdr->chksum = 0;
 }
@@ -147,10 +147,10 @@ static void connected(struct netdevice *dev,
     s->needsAck = 1;
     s->state = SynReceived;
 
-    s->read_fn = fn;
-    s->read_buf = (void*)(s + 1);
-    s->read_offset = 0;
-    s->read_max = MaxReadBufffer;
+    s->readFn = fn;
+    s->readBuf = (void*)(s + 1);
+    s->readOffset = 0;
+    s->readMax = MaxReadBufffer;
 
     s->next = all_streams;
     all_streams = s;
@@ -195,7 +195,7 @@ static void buffer_data(struct netdevice* dev, tcp_hdr *hdr,
         stream * stream, uint32_t len) {
     if (!len) return;
 
-    if (stream->read_offset + len > stream->read_max) {
+    if (stream->readOffset + len > stream->readMax) {
         console_print_string("Out of buffer space in read ... dropping packet\n");
         return;
     }
@@ -203,13 +203,13 @@ static void buffer_data(struct netdevice* dev, tcp_hdr *hdr,
     stream->ackSeq = ntol(hdr->sequence) + len;
 
     const uint8_t* data = (const uint8_t*)hdr + 4 * hdr->offset;
-    memcpy(stream->read_buf + stream->read_offset, data, len);
-    stream->read_offset += len;
+    memcpy(stream->readBuf + stream->readOffset, data, len);
+    stream->readOffset += len;
 }
 
 static void pushit(stream * stream) {
-    stream->read_fn(stream, stream->read_buf, stream->read_offset);
-    stream->read_offset = 0;
+    stream->readFn(stream, stream->readBuf, stream->readOffset);
+    stream->readOffset = 0;
 }
 
 static void fin(struct netdevice * dev, stream * s) {
