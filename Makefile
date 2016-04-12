@@ -20,6 +20,9 @@ bin/alltests: $(TEST_OBJS) $(filter-out out/entry.o out/panic.o out/main.o out/i
 	-mkdir -p bin/
 	$(CC) -o $@ $^ $|
 
+run_nonet: disk.img
+	IMAGE=disk.img DISPLAY_LIBRARY=$(DISPLAY_LIBRARY) CYL=128 LD_PRELOAD=/usr/lib/x86_64-linux-gnu/libXpm.so.4 bochs -q -f etc/bochsrc_nn
+
 run: disk.img
 	sudo IMAGE=disk.img DISPLAY_LIBRARY=$(DISPLAY_LIBRARY) CYL=128 LD_PRELOAD=/usr/lib/x86_64-linux-gnu/libXpm.so.4 bochs -q -f etc/bochsrc
 
