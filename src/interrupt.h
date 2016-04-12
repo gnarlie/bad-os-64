@@ -6,6 +6,7 @@
 #define IRQ1 33
 
 typedef struct registers {
+    uint64_t ss;
     uint64_t ds;
     uint64_t es;
     uint64_t fs;

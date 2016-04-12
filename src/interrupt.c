@@ -8,12 +8,15 @@ void register_interrupt_handler(uint8_t n, isr_t handler, void * user) {
     interrupt_handlers[n].user = user;
 }
 
+extern void dump_regs(registers_t* regs);
+
 void isr_handler(uint8_t n, registers_t * regs) {
     isr_t handler = interrupt_handlers[n].fn;
     if (handler) {
         handler(regs, interrupt_handlers[n].user);
     }
     else {
+        console_print_string("Unhandled ISR %d\n ", n);
         panic("unhandled exception");
     }
 }

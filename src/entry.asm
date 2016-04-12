@@ -5,17 +5,18 @@ USE64
 [EXTERN isr_handler]
 [EXTERN console_clear_screen]
 [EXTERN console_print_string]
-[EXTERN console_put_hex]
-[EXTERN console_put_hex64]
 [EXTERN task_poll_for_work]
 [EXTERN panic]
+[EXTERN dump_regs]
 
 [GLOBAL start]
 [GLOBAL create_gate]
 [GLOBAL create_isr_handler]
-[GLOBAL main_loop]
-[GLOBAL halt]
 [GLOBAL install_gdt]
+[GLOBAL install_tss]
+[GLOBAL call_user_function]
+[GLOBAL syscall]
+[GLOBAL init_syscall]
 
 
 start:
@@ -53,25 +54,105 @@ install_gdt:
 	lgdt [gdtr64]
     ret
 
+%define segment(idx, dpl) ((idx << 3) + dpl)
+
+install_tss:
+    mov ax, segment(6,0)
+    ltr ax
+    ret
+
+; rdi - user function to call
+call_user_function:
+    push continue_to_kernel
+
+    mov ax, segment(4, 3)
+    ; switch data selectors to user mode selectors
+    mov ds, ax
+    mov es, ax
+    mov fs, ax
+    mov gs, ax
+
+    mov rax, rsp
+    push segment(4, 3) ; user stack
+    push rax      ; stack
+    pushf
+    push segment(5, 3) ; user code segment
+    push rdi
+    iretq
+
+; ring 3 thunk to get back to kernel space
+continue_to_kernel:
+    mov rdi, end_user_fn
+    syscall
+
+end_user_fn:
+    ret
+
+; *********************************************
+; System call crappe
+
+init_syscall:
+    ; bits 16..31: sysret cs & ss
+    ; bits  0..15: syscall cs & ss
+    mov edx, (segment(3, 3) << 16) + segment(1, 0) ; 0x00200008
+    xor eax, eax
+    mov ecx, 0xc0000081 ; STAR
+    wrmsr
+
+    mov rax, syscall_enter
+    mov rdx, rax
+    shr rdx, 32
+    mov ecx, 0xc0000082 ; LSTAR
+    wrmsr
+
+    ret
+
+; rdi - system call function
+; esi - number of parameters
+syscall:
+    syscall
+    ret
+
+syscall_enter:
+    push r11 ; store adjusted flags
+    push rcx ; store next rip
+             ; should switch stacks here as well
+
+    mov rax, rdi
+    mov rdi, rsi
+    call rax
+
+    pop rcx ; pop next ring 3 instruction
+    pop r11 ; pop flags
+    sysretq
+
+; ----------------------
+; Create a call gate for an irq. Stores the IDT entry at ES:[EDI*16]. Assumes that the IDTR
+; has been set to point to address 0. Pure64 has done this for us. TODO: setup our own dammnit!
+;   rdi - gate number
+;   rsi - function to call
 create_gate:
+	shl rdi, 4
     mov rax, rsi
+
 ; IDT entry
 ;   2 bytes : low bits of fun
-;   2 byte : cs selector
-;   1 byte : 0
-;   1 byte : flags
+;   2 byte  : cs selector
+;   1 byte  : 0
+;   1 byte  : flags
 ;   2 bytes : middle 16 bits
 ;   4 bytes : high 32 bits
 ;   4 bytes : 0
 
-	shl rdi, 4			; quickly multiply isr# by 16
-	stosw				; store the low word (15..0)
-	shr rax, 16
-	add rdi, 4			; skip the gate marker
-	stosw				; store the high word (31..16)
-	shr rax, 16
-	stosd				; store the high dword (63..32)
-ret
+	stosw               ; store the low word (15..0)
+	add rdi, 3			; skip selector (2), reserved,
+    mov al,  0xee       ; flags: 3 bits DPL, 1 storage, 3 type
+	stosb
+	shr rax, 16         ; move mid word to ax & store
+	stosw
+	shr rax, 16         ; move high dword to ax & store
+	stosd
+    ret
 
 %macro PUSH_ALL 0
     push rbp
@@ -98,6 +179,8 @@ ret
     push rcx
     mov ecx, ds
     push rcx
+    mov ecx, ss
+    push rcx
 
     mov rsi, rsp
 %endmacro
@@ -111,6 +194,8 @@ ret
     mov fs, ecx
     pop rcx
     mov gs, ecx
+    pop rcx
+    ; mov ss, ecx
 
     pop rdi
     pop rsi
@@ -230,5 +315,6 @@ ISR 31
 lastStack     dq 0
 stack_differs db `Stack pointer has changed\n`, 0
 hello_message db `Hello, World\n`, 0
+hello_message_2 db `Hello, World from Kernel %p\n`, 0
 gdtr64        dw 0
               dq 0x0000000000001000

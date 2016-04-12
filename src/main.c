@@ -10,36 +10,19 @@
 #include "service/http.h"
 
 void dump_regs(registers_t* regs) {
-    console_print_string("rax "); console_put_hex64(regs->rax);
-    console_print_string(" rbx "); console_put_hex64(regs->rbx);
-    console_print_string("\n");
-    console_print_string("rcx "); console_put_hex64(regs->rcx);
-    console_print_string(" rdx "); console_put_hex64(regs->rdx);
-    console_print_string("\n");
-    console_print_string("r8  "); console_put_hex64(regs->r8);
-    console_print_string(" r9  "); console_put_hex64(regs->r9);
-    console_print_string("\n");
-    console_print_string("r10 "); console_put_hex64(regs->r10);
-    console_print_string(" r11 "); console_put_hex64(regs->r11);
-    console_print_string("\n");
-    console_print_string("r12 "); console_put_hex64(regs->r12);
-    console_print_string(" r13 "); console_put_hex64(regs->r13);
-    console_print_string("\n");
-    console_print_string("r14 "); console_put_hex64(regs->r14);
-    console_print_string(" r15 "); console_put_hex64(regs->r15);
-    console_print_string("\n");
-    console_print_string("rsi "); console_put_hex64(regs->rsi);
-    console_print_string(" rdi "); console_put_hex64(regs->rdi);
-    console_print_string("\n");
-    console_print_string("ds "); console_put_hex(regs->ds);
-    console_print_string(" es "); console_put_hex(regs->es);
-    console_print_string(" fs "); console_put_hex(regs->fs);
-    console_print_string(" gs "); console_put_hex(regs->gs);
-    console_print_string("\n");
+    console_print_string("rax %p rbx %p\n", regs->rax, regs->rbx);
+    console_print_string("rcx %p rdx %p\n", regs->rcx, regs->rdx);
+    console_print_string("r8  %p r9  %p\n", regs->r8, regs->r9);
+    console_print_string("r10 %p r11 %p\n", regs->r10, regs->r11);
+    console_print_string("r12 %p r13 %p\n", regs->r12, regs->r13);
+    console_print_string("r14 %p r15 %p\n", regs->r14, regs->r15);
+    console_print_string("rsi %p rdi %p\n", regs->rsi, regs->rdi);
+    console_print_string("ds %x es %x fs %x gs %x\n",
+            (uint32_t)regs->ds, (uint32_t)regs->es, (uint32_t)regs->fs, (uint32_t)regs->gs);
     console_print_string("rip "); console_put_hex64(regs->rip);
     console_print_string(" cs  "); console_put_hex(regs->cs);
     console_print_string("\n");
-    console_print_string("rflags "); console_put_hex64(regs->rflags);
+    console_print_string("rflags %p", regs->rflags);
     console_print_string(regs->rflags & 1 << 14 ? " N" : " n");
     console_print_string(regs->rflags & 1 << 11 ? "O" : "o");
     console_print_string(regs->rflags & 1 << 10 ? "D" : "d");
@@ -50,12 +33,18 @@ void dump_regs(registers_t* regs) {
     console_print_string(regs->rflags & 1 << 4 ? "A" : "a");
     console_print_string(regs->rflags & 1 << 2 ? "P" : "p");
     console_print_string(regs->rflags & 1 ? "C" : "c");
-    console_print_string(" IOPL="); console_put_hex((regs->rflags >> 12) & 3);
-    console_print_string("\n");
-    console_print_string("error "); console_put_hex64(regs->errorCode);
-    console_print_string("\n");
-    console_print_string("rbp "); console_put_hex64(regs->rbp);
-    console_print_string("\n");
+    console_print_string(" IOPL=%x\n", (uint32_t)((regs->rflags >> 12) & 3));
+    console_print_string("error %p\n", regs->errorCode);
+    console_print_string("ss %x rsp %p - rbp %p\n", (uint32_t)regs->ss, regs + 1, regs->rbp);
+
+    uint64_t cr0, cr2, cr3, cr4;
+    __asm__ __volatile__ ("movq %%cr0, %%rax\n\t movq %%rax, %0\n\t"
+                          "movq %%cr2, %%rax\n\t movq %%rax, %1\n\t"
+                          "movq %%cr3, %%rax\n\t movq %%rax, %2\n\t"
+                          "movq %%cr4, %%rax\n\t movq %%rax, %3\n\t":
+            "=m"(cr0), "=m"(cr2), "=m"(cr3), "=m"(cr4)::"rax");
+    console_print_string("cr0 %p cr2 %p\n", cr0, cr2);
+    console_print_string("cr3 %p cr4 %p\n", cr3, cr4);
 }
 
 void breakpoint(registers_t* regs, void*user) {
@@ -66,7 +55,6 @@ void breakpoint(registers_t* regs, void*user) {
 void protection(registers_t* regs, void*user) {
     console_print_string("gpf\n");
     dump_regs(regs);
-    asm ("xchg %bx, %bx");
     panic("cannot continue");
 }
 
@@ -113,6 +101,49 @@ struct gdt_entry {
     uint8_t baseHigh;
 } __attribute__((packed));
 
+struct tss {
+   uint32_t reserved0;
+   uint64_t rsp0;
+   uint64_t rsp1;
+   uint64_t rsp2;
+   uint64_t reserved1;
+   uint64_t ist1;
+   uint64_t ist2;
+   uint64_t ist3;
+   uint64_t ist4;
+   uint64_t ist5;
+   uint64_t ist6;
+   uint64_t ist7;
+   uint64_t reserved2;
+   uint16_t reserved3;
+   uint16_t ioMapBaseAddr;
+};
+
+static struct tss tss;
+
+static void create_tss(struct gdt_entry* entry) {
+    bzero(&tss, sizeof(tss));
+
+    uint64_t base = (uint64_t)&tss;
+    uint32_t limit = sizeof tss;
+
+    entry->lowLimit = limit - 1;
+    entry->baseLow = base & 0xffff;
+    entry->baseMid = (base >> 8) & 0xff;
+    entry->type = 9;
+    entry->descType = 0;
+    entry->privLvl = 3;
+    entry->present = 1;
+    entry->segLimit = 0;
+    entry->available = 0;
+    entry->l = 0;
+    entry->db = 0;
+    entry->granularity = 0;
+    entry->baseHigh = (base >> 24) & 0xff;
+
+    // TODO IST's
+}
+
 /****
  * Starting with the boot loader's GDT, which is good enough for kernel
  * operation - extend to allow user mode
@@ -120,68 +151,95 @@ struct gdt_entry {
 
 static void init_gdt() {
     extern void install_gdt(void*, uint16_t);
+    extern void install_tss();
 
-    struct gdt_entry gdt[5];
+    struct gdt_entry gdt[8];
     bzero(gdt, sizeof(gdt));
 
     // gdt[0] is null selector ... leave 0's
 
     // gdt[1] is kernel code
-    gdt[1].granularity = 0;
+    gdt[1].granularity = 1;
     gdt[1].l = 1;
     gdt[1].present = 1;
     gdt[1].descType = 1;
     gdt[1].type = 0xA; // execute / read
+    gdt[1].lowLimit = 0xffff;
+    gdt[1].segLimit = 0xf;
 
     // gdt[2] is kernel data
     gdt[2] = gdt[1];
-    gdt[2].type = 2;  // read / write
+    gdt[2].type = 6;  // read / write
 
-    // gdt[3] is user code
-    gdt[3] = gdt[1];
-    gdt[3].privLvl = 3;
+    // gdt[3] is another null selector (s/b 32 bit code)
+    gdt[3] = gdt[0];
 
     // gdt[4] is user data
     gdt[4] = gdt[2];
     gdt[4].privLvl = 3;
 
-    install_gdt(gdt, sizeof(struct gdt_entry) * 5);
+    // gdt[5] is user code (64 bit)
+    gdt[5] = gdt[1];
+    gdt[5].privLvl = 3;
+
+    // gdt[6/7] is the 64bit TSS descriptor
+    create_tss(&gdt[6&7]);
+
+    install_gdt(gdt, sizeof(gdt));
+    install_tss();
 }
+
+void syscall(void * fn, void *);
+
+void user_mode() {
+    syscall(console_print_string, "hello from ring 3\n");
+    // TODO - ring 3 interrupt handling:
+    // asm volatile ("int $3" ::: "memory" );
+}
+
+void call_user_function(void*);
+void init_syscall();
 
 void main() {
     console_print_string("Hello from C\n");
+
     init_interrupts();
     init_gdt();
+    init_syscall();
 
     kmem_init();
 
     uint32_t ram = *(uint32_t*)0x5020;
     uint16_t cpuSpeed = *(uint16_t*)0x5010;
-    console_print_string("System RAM: %d MB. CPU Speed: %d MHz\n", ram, cpuSpeed);
+    console_print_string("System RAM: %d MB. CPU Speed: %d MHz\n",
+            ram, cpuSpeed);
 
     // need to make these less arbiratry, based on the
     // actual memory map
     kmem_add_block(0x200000, 1024*1024*1024, 0x400);
 
-    register_interrupt_handler(3, breakpoint, 0);
-    register_interrupt_handler(0xd, protection, 0);
-
     init_pci();
     init_ne2k();
 
     init_keyboard();
+
+    register_interrupt_handler(3, breakpoint, 0);
+    register_interrupt_handler(0xd, protection, 0);
+    register_interrupt_handler(IRQ0, timer_irq, 0);
+
     // try a breakpoint
-//    uint64_t here;
-//    asm volatile ("lea (%%rip), %0" : "=r" (here) );
-//    asm volatile ("int $3" ::: "memory" );
-//    console_print_string("breakpoint was just after: ");
-//    console_put_hex64(here);
-//    console_print_string("\n");
+    //uint64_t here;
+    //asm volatile ("lea (%%rip), %0" : "=r" (here) );
+    //asm volatile ("int $3" );
+    //console_print_string("breakpoint was just after: %p\n", here);
 
     //enable the timer and display a clock
     update_task = task_alloc(update_clock, 0);
     add_ref(update_task);
-    register_interrupt_handler(IRQ0, timer_irq, 0);
 
     init_http();
+
+    console_print_string("Calling user fn %p\n", user_mode);
+    call_user_function(user_mode);
 }
+

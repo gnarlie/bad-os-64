@@ -60,9 +60,9 @@ void console_put(char c) {
             break;
         case('\b'):
             current -= 2;
-            *current = ' ';
             if (current < VideoStart)
                 current = VideoStart;
+            *current = ' ';
             break;
         default:
             *current = c;
