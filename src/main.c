@@ -9,6 +9,8 @@
 #include "ne2k.h"
 #include "service/http.h"
 
+void call_user_function(void*);
+
 void dump_regs(registers_t* regs) {
     console_print_string("rax %p rbx %p\n", regs->rax, regs->rbx);
     console_print_string("rcx %p rdx %p\n", regs->rcx, regs->rdx);
@@ -47,20 +49,23 @@ void dump_regs(registers_t* regs) {
     console_print_string("cr3 %p cr4 %p\n", cr3, cr4);
 }
 
-void breakpoint(registers_t* regs, void*user) {
+static void breakpoint(registers_t* regs, void*user) {
     console_print_string("breakpoint!\n");
     dump_regs(regs);
 }
 
-void protection(registers_t* regs, void*user) {
-    console_print_string("gpf\n");
+static void protection(registers_t* regs, void*user) {
+    if (user)
+        console_print_string("gpf\n");
+    else 
+        console_print_string("pf\n");
     dump_regs(regs);
     panic("cannot continue");
 }
 
 static void update_clock(void* unused) {
     static uint32_t time;
-    uint32_t now = read_rtc();
+    uint32_t now = gettime();
 
     if (time != now) {
         time = now;
@@ -80,9 +85,8 @@ static void update_clock(void* unused) {
     }
 }
 
-Task * update_task;
-void timer_irq(registers_t* regs, void*user) {
-    task_enqueue(update_task);
+void timer_irq(registers_t* regs, void *update_task) {
+    task_enqueue((Task*)update_task);
 }
 
 struct gdt_entry {
@@ -197,8 +201,12 @@ void user_mode() {
     // asm volatile ("int $3" ::: "memory" );
 }
 
-void call_user_function(void*);
 void init_syscall();
+
+void user_task(void * fn) {
+    read_rtc();
+    call_user_function(fn);
+}
 
 void main() {
     console_print_string("Hello from C\n");
@@ -225,7 +233,7 @@ void main() {
 
     register_interrupt_handler(3, breakpoint, 0);
     register_interrupt_handler(0xd, protection, 0);
-    register_interrupt_handler(IRQ0, timer_irq, 0);
+    register_interrupt_handler(0xe, protection, (void*)1);
 
     // try a breakpoint
     //uint64_t here;
@@ -234,12 +242,12 @@ void main() {
     //console_print_string("breakpoint was just after: %p\n", here);
 
     //enable the timer and display a clock
-    update_task = task_alloc(update_clock, 0);
+    Task * update_task = task_alloc(user_task, update_clock);
     add_ref(update_task);
+    register_interrupt_handler(IRQ0, timer_irq, update_task);
 
     init_http();
 
-    console_print_string("Calling user fn %p\n", user_mode);
     call_user_function(user_mode);
 }
 

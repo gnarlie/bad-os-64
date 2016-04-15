@@ -5,6 +5,10 @@
 #define CMOS_ADDR 0x70
 #define CMOS_DATA 0x71
 
+static uint32_t time;
+
+uint32_t gettime() { return time; }
+
 static int is_update_in_progress() {
     outb(CMOS_ADDR, 0x0a);
     return inb(0x71) & 0x80;
@@ -30,7 +34,7 @@ static uint32_t read_rtc_internal() {
     char day = get_cmos_reg(0x07);
     char month = get_cmos_reg(0x08);
     uint16_t year = get_cmos_reg(0x09);
-    //todo century register ... ?
+    //TODO century register ... ?
 
     char regB = get_cmos_reg(0x0B);
     if (0 == (regB & 0x04)) {
@@ -52,8 +56,6 @@ static uint32_t read_rtc_internal() {
         ((hour * 60) + minute) * 60 + second;
 }
 
-#include "console.h"
-
 uint32_t read_rtc() {
     uint32_t a, b;
     do {
@@ -61,5 +63,5 @@ uint32_t read_rtc() {
         b = read_rtc_internal();
     } while (a != b);
 
-    return a;
+    return time = a;
 }

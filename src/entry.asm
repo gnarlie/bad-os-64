@@ -1,5 +1,6 @@
 USE64
 
+
 [EXTERN main]
 [EXTERN irq_handler]
 [EXTERN isr_handler]
@@ -32,6 +33,7 @@ main_loop:
     cmp eax, esp
     jne stack_slam
     call task_poll_for_work
+    sti
     hlt
     jmp main_loop
 
@@ -74,7 +76,7 @@ call_user_function:
 
     mov rax, rsp
     push segment(4, 3) ; user stack
-    push rax      ; stack
+    push rax           ; stack
     pushf
     push segment(5, 3) ; user code segment
     push rdi
@@ -85,6 +87,7 @@ continue_to_kernel:
     mov rdi, end_user_fn
     syscall
 
+; back in kernel space
 end_user_fn:
     ret
 
@@ -316,5 +319,6 @@ lastStack     dq 0
 stack_differs db `Stack pointer has changed\n`, 0
 hello_message db `Hello, World\n`, 0
 hello_message_2 db `Hello, World from Kernel %p\n`, 0
+pct_p         db `here: %p\n`, 0
 gdtr64        dw 0
               dq 0x0000000000001000

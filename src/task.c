@@ -51,7 +51,6 @@ void task_enqueue(Task * task) {
 
 Task* task_get() {
     if (head) {
-
         disable_interrupts(); //replace with a proper lock
         tasklet t = head->task;
 
