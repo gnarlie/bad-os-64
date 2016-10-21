@@ -208,6 +208,9 @@ void user_task(void * fn) {
     call_user_function(fn);
 }
 
+extern void init_fat32();
+extern void init_ata();
+
 void main() {
     console_print_string("Hello from C\n");
 
@@ -222,7 +225,7 @@ void main() {
     console_print_string("System RAM: %d MB. CPU Speed: %d MHz\n",
             ram, cpuSpeed);
 
-    // need to make these less arbiratry, based on the
+    // TODO need to make these less arbiratry, based on the
     // actual memory map
     kmem_add_block(0x200000, 1024*1024*1024, 0x400);
 
@@ -234,6 +237,9 @@ void main() {
     register_interrupt_handler(3, breakpoint, 0);
     register_interrupt_handler(0xd, protection, 0);
     register_interrupt_handler(0xe, protection, (void*)1);
+
+    init_ata();
+    init_fat32();
 
     // try a breakpoint
     //uint64_t here;

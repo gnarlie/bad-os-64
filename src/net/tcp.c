@@ -155,6 +155,7 @@ static void connected(struct netdevice *dev,
     s->next = all_streams;
     all_streams = s;
 
+    // reply with syn-ack
     header_from_stream(s, hdr, Syn | Ack);
     s->localSeq++;
 
@@ -247,7 +248,7 @@ static void syn(struct netdevice * dev, tcp_hdr *hdr, uint32_t srcIp) {
 
     listen_state * l = all_listeners;
     while(l) {
-        if (l->port == dst) break;
+        if (l->port == dst) break; // ONEDAY listen on iface? ...
         l = l->next;
     }
 

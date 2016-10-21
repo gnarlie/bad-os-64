@@ -9,6 +9,8 @@ static uint32_t readPciConfig(uint8_t bus, uint8_t slot, uint8_t func, uint8_t o
     outl(0xcf8, address);
 
     uint32_t tmp = inl(0xcfc);
+
+    //quietly return EAX ?
 }
 
 static void config_word(uint8_t slot, uint8_t o) {

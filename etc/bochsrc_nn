@@ -1,5 +1,6 @@
 megs: 1024
 ata0-master: type=disk, path=$IMAGE, mode=flat, cylinders=$CYL, heads=4, spt=4, translation=none
+ata0-slave: type=disk, path=fat32.img
 boot: disk
 log: bochsout.txt
 mouse: enabled=0

@@ -86,12 +86,20 @@ void console_clear_screen() {
     set_cursor();
 }
 
+static void console_put_string_raw(const char * str) {
+    while(*str) console_put(*str++);
+}
+
 void console_print_string(const char * str, ...) {
     __builtin_va_list args;
     __builtin_va_start(args, str);
     while (*str) {
         if( *str == '%') {
             switch (*++str) {
+                case('s'):
+                    console_put_string_raw(
+                            __builtin_va_arg( args, const char * ));
+                    break;
                 case('d'):
                     console_put_dec(__builtin_va_arg( args, uint32_t ));
                     break;
