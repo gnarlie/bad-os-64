@@ -58,16 +58,19 @@ typedef struct directory_entry {
     uint32_t fileSize;
 } __attribute((packed)) directory_entry;
 
+struct {
+    bios_parameter_block  bpb;
+    fat32_boot_sector  bs;
+} __attribute__((packed)) data;
+
+inline uint32_t lbaOfCluster(uint32_t cluster) {
+    uint32_t fatSectors = data.bs.tableSize * data.bpb.noFats;
+    uint32_t firstDataSector = data.bpb.reservedSectors + fatSectors;
+    return firstDataSector + (cluster - 2) * data.bpb.sectorsPerCluster;
+}
+
 void init_fat32() {
-
-    struct {
-        bios_parameter_block  bpb;
-        fat32_boot_sector  bs;
-    } __attribute__((packed)) data;
-
     bzero(&data, sizeof(data));
-
-    console_print_string("Addr %p\n", &data);
 
     readSector(0, &data, sizeof(data));
 
@@ -75,6 +78,29 @@ void init_fat32() {
     strncpy(label, data.bs.label, 8);
     label[8] = 0;
 
-    console_print_string("Hello from FAT. Label: %s\n", label);
+    console_print_string("Hello from FAT. Label: %s Sector size %d, Cluster size: %d\n", label, data.bpb.bytesPerSector, data.bpb.sectorsPerCluster);
+
+    uint32_t lba = lbaOfCluster(data.bs.rootCluster);
+    console_print_string("Sector %d\n", lba);
+
+    directory_entry root[16];
+    if (readSector(lba, &root, sizeof(root))) {
+        console_print_string("Could not read root dir\n");
+        return;
+    }
+
+    for (uint16_t i = 0; root[i].name[0] && i < 16; ++i) {
+        if ((unsigned char)root[i].name[0] == 0xe5) continue; // unused
+        if (root[i].attributes == 0xf) continue; // lfn
+
+        char name[13];
+        strncpy(name, root[i].name, 8);
+        strncpy(name + 9, root[i].ext, 3);
+        name[8] = '.';
+        name[12] = 0;
+
+        console_print_string("Root entry. flags %x", root[i].attributes);
+        console_print_string(" name %s\n", name);
+    }
 };
 

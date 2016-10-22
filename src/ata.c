@@ -48,8 +48,9 @@ AtaDevice devices[] = {
     {.bus = 3, .base = 0x168, .ctrl=0x3f6, .ms = Slave},
 };
 
-// Use ATA PIO. Consider switching to DMA
+// Use ATA PIO. Consider switching to DMA at some point
 int readSector(uint64_t lba, void * buf, size_t sz) {
+    // hardcoded device for now
     AtaDevice * dev = &devices[1];
 
     uint8_t status = inb(dev->base + CommandStatus);
@@ -71,8 +72,8 @@ int readSector(uint64_t lba, void * buf, size_t sz) {
 
     outb(dev->base + SectorCount, nSectors & 0xff);
     outb(dev->base + SectorLBAlo, lba2[0]);
-    outb(dev->base + CylinderLowLBAmid, lba2[2]);
-    outb(dev->base + CylinderHighLBAhi, lba2[3]);
+    outb(dev->base + CylinderLowLBAmid, lba2[1]);
+    outb(dev->base + CylinderHighLBAhi, lba2[2]);
 
     outb(dev->base + CommandStatus, 0x24); // 0x24 == read sectors ext
 
