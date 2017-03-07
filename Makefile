@@ -4,7 +4,7 @@ DISPLAY_LIBRARY ?= sdl
 
 C_FILES=$(shell find src -name '*.c')
 ASM_FILES=$(shell find src -name '*.asm')
-TEST_SRC=$(shell find test -name '*.c')
+TEST_SRC=$(shell find test -path test/tinytest -prune -o -name '*.c' -print)
 
 OBJS=$(patsubst src/%.asm, out/%.o, $(ASM_FILES)) $(patsubst src/%.c, out/%.o, $(C_FILES))
 TEST_OBJS=$(patsubst test/%.c, out/test/%.o, $(TEST_SRC))

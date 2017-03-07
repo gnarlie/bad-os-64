@@ -1,4 +1,4 @@
-#include "../tinytest.h"
+#include "../tinytest/tinytest.h"
 
 #include "util/list.h"
 

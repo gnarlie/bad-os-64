@@ -5,7 +5,7 @@
 #include "memory.h"
 #include "string.h"
 
-#include "../tinytest.h"
+#include "../tinytest/tinytest.h"
 
 uint8_t * g_data = 0;
 uint16_t g_len;

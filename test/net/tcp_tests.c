@@ -3,7 +3,7 @@
 #include "net/sbuff.h"
 #include "net/arp.h"
 
-#include "../tinytest.h"
+#include "../tinytest/tinytest.h"
 
 #include <stdio.h>
 

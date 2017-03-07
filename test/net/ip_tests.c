@@ -1,7 +1,7 @@
 #include "net/ip.h"
 #include "net/arp.h"
 #include "net/device.h"
-#include "../tinytest.h"
+#include "../tinytest/tinytest.h"
 #include "tobytes.h"
 #include "net/sbuff.h"
 

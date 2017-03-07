@@ -1,5 +1,5 @@
 #include "memory.h"
-#include "tinytest.h"
+#include "tinytest/tinytest.h"
 
 TEST(simpleAllocation) {
     extern void * block;

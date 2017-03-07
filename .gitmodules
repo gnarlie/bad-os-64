@@ -1,0 +1,3 @@
+[submodule "test/tinytest"]
+	path = test/tinytest
+	url = git@github.com:gnarlie/tinytest.git

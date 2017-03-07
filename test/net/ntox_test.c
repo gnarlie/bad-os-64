@@ -1,6 +1,6 @@
 #include "net/ntox.h"
 
-#include "../tinytest.h"
+#include "../tinytest/tinytest.h"
 
 TEST(convertShorts) {
     ASSERT_EQUALS(0x1234, ntos(0x3412));

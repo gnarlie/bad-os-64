@@ -1,6 +1,6 @@
 #include "task.h"
 #include "memory.h"
-#include "tinytest.h"
+#include "tinytest/tinytest.h"
 
 void bump(void* user) {
     (*(int*)user) ++;

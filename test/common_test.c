@@ -1,6 +1,6 @@
 #include "common.h"
 
-#include "tinytest.h"
+#include "tinytest/tinytest.h"
 
 TEST(strncmp) {
     ASSERT_INT_EQUALS(0, strncmp("a", "a", 1));
