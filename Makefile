@@ -38,12 +38,18 @@ out/test/%.o: test/%.c
 	mkdir -p $(dir $@)
 	$(CC) -c $(TEST_CFLAGS) -o $@ $<
 
-kernel.sys: $(OBJS)
-	ld  -Map=kernel.sym -Tsrc/kernel.ld -melf_x86_64 -o /tmp/kernel $^
-	cat bootloader/pure64.sys /tmp/kernel > kernel.sys
+kernel.sys: $(OBJS) Pure64/pure64.sys
+	ld  -Map=kernel.sym -Tsrc/kernel.ld -melf_x86_64 -o /tmp/kernel $(OBJS) 
+	cat Pure64/pure64.sys /tmp/kernel > kernel.sys
 
-disk.img: kernel.sys
-	./createimage.sh disk.img 1 bootloader/bmfs_mbr.sys kernel.sys
+Pure64/bmfs_mbr.sys Pure64/pure64.sys:
+	cd Pure64 && ./build.sh
+
+	cd Pure64 && ./build.sh
+
+disk.img: Pure64/bmfs_mbr.sys kernel.sys
+	cat  $^ > /tmp/kernel
+	./createimage.sh disk.img 1 Pure64/bmfs_mbr.sys kernel.sys
 
 fat32.img: image/*
 	rm -f $@

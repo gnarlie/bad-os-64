@@ -1,3 +1,6 @@
 [submodule "test/tinytest"]
 	path = test/tinytest
 	url = https://github.com/gnarlie/tinytest.git
+[submodule "Pure64"]
+	path = Pure64
+	url = https://github.com/ReturnInfinity/Pure64.git
