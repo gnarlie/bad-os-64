@@ -16,7 +16,7 @@ static void capture(struct netdevice *dev, sbuff * sbuff) {
 }
 
 
-void udp_echo() {
+TEST(udp_echo) {
     uint8_t *arp = tobytes("0001080006040002aad745548156c0a80301b0c420000000c0a80302");
     uint8_t* request = tobytes("e30a0007000cbff6666f6f0a");
     uint8_t* reply =   tobytes("0007e30a000c4768666f6f0a");

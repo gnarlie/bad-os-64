@@ -1,5 +1,6 @@
 megs: 1024
 ata0-master: type=disk, path=$IMAGE, mode=flat, cylinders=$CYL, heads=4, spt=4, translation=none
+ata0-slave: type=disk, path=fat32.img
 boot: disk
 log: bochsout.txt
 mouse: enabled=0
@@ -7,9 +8,5 @@ clock: sync=both
 cpu: ips=5000000
 display_library:$DISPLAY_LIBRARY
 ne2k: ioaddr=0x300, irq=9, mac=b0:c4:20:00:00:00, enabled=1, ethmod=tuntap, ethdev=/dev/net/tun, script=etc/tunconfig
-#ne2k: ioaddr=0x300, irq=9, mac=b0:c4:20:00:00:00, enabled=1, ethmod=vnet, ethdev=/tmp/vdt.ctl
-#i440fxsupport: slot3=ne2k
 pci: slot3=ne2k
-#debug: action=report
-#magic_break: enabled=1
 com1: enabled=1, mode=file, dev=serial.out

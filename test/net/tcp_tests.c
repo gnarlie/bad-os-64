@@ -17,7 +17,7 @@ static void capture(struct netdevice *dev, sbuff* buff) {
     g_len = len;
 }
 
-void connection_refused() {
+TEST(connection_refused) {
     struct BytesLen syn;
     syn = tobyteslen("92061fa31cf94a9700000000a0026db075c40000020406180402080a02ebc4ad0000000001030307");
     struct netdevice dev;
@@ -39,7 +39,7 @@ static tcp_read_fn accept() {
     return NULL;
 }
 
-void connection_synack() {
+TEST(connection_synack) {
     struct BytesLen syn;
     syn = tobyteslen("c7780050ee75886200000000a00272109ec30000020405b40402080a04316d060000000001030307");
     struct netdevice dev;

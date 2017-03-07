@@ -1,7 +1,8 @@
-#include "common.h"
-#include "console.h"
+#include "fs/fat32.h"
 
-#include "ata.h"
+#include "console.h"
+#include "memory.h"
+#include "errno.h"
 
 typedef struct bios_parameter_block {
     char   skip[3];             // jump instruction or similar
@@ -58,35 +59,41 @@ typedef struct directory_entry {
     uint32_t fileSize;
 } __attribute((packed)) directory_entry;
 
-struct {
+typedef struct {
+    file_system fs;
     bios_parameter_block  bpb;
     fat32_boot_sector  bs;
-} __attribute__((packed)) data;
+    storage_device * store;
+} __attribute__((packed)) fat_device;
 
-inline uint32_t lbaOfCluster(uint32_t cluster) {
-    uint32_t fatSectors = data.bs.tableSize * data.bpb.noFats;
-    uint32_t firstDataSector = data.bpb.reservedSectors + fatSectors;
-    return firstDataSector + (cluster - 2) * data.bpb.sectorsPerCluster;
+inline uint32_t lbaOfCluster(fat_device* self, uint32_t cluster) {
+    uint32_t fatSectors = self->bs.tableSize * self->bpb.noFats;
+    uint32_t firstDataSector = self->bpb.reservedSectors + fatSectors;
+    return firstDataSector + (cluster - 2) * self->bpb.sectorsPerCluster;
 }
 
-void init_fat32() {
-    bzero(&data, sizeof(data));
+static void filenameFromDirectoryEntry(const directory_entry* de, char * name, size_t sz) {
+    bzero(name, 13);
+    strncpy(name, de->name, 8);
+    char *dest = strnchr(name, ' ', 8);
+    if (!dest) dest = name + 8;
+    (*dest++) = '.';
+    strncpy(dest, de->ext, 3);
+    char * end = name + sizeof(name) - 1;
+    while( (*end == ' ' || *end == 0)  && end >= name) {
+        *end-- = 0;
+    }
+}
 
-    readSector(0, &data, sizeof(data));
+static int find(file_system * fs, const char * filename, directory_entry * buf) {
+    fat_device * dev = (fat_device*) fs;
+    storage_device * store = dev->store;
 
-    char label[9];
-    strncpy(label, data.bs.label, 8);
-    label[8] = 0;
-
-    console_print_string("Hello from FAT. Label: %s Sector size %d, Cluster size: %d\n", label, data.bpb.bytesPerSector, data.bpb.sectorsPerCluster);
-
-    uint32_t lba = lbaOfCluster(data.bs.rootCluster);
-    console_print_string("Sector %d\n", lba);
+    uint32_t lba = lbaOfCluster(dev, dev->bs.rootCluster);
 
     directory_entry root[16];
-    if (readSector(lba, &root, sizeof(root))) {
-        console_print_string("Could not read root dir\n");
-        return;
+    if (store->read_sector(store, lba, &root, sizeof(root))) {
+        return EINVALID;
     }
 
     for (uint16_t i = 0; root[i].name[0] && i < 16; ++i) {
@@ -94,13 +101,93 @@ void init_fat32() {
         if (root[i].attributes == 0xf) continue; // lfn
 
         char name[13];
-        strncpy(name, root[i].name, 8);
-        strncpy(name + 9, root[i].ext, 3);
-        name[8] = '.';
-        name[12] = 0;
+        filenameFromDirectoryEntry(root + i, name, sizeof(name));
+        if (0 == strncmp(name, filename, sizeof(name))) {
+            if (buf) *buf = root[i];
+            return EOK;
+        }
+    }
 
-        console_print_string("Root entry. flags %x", root[i].attributes);
+    return ENOTFOUND;
+}
+
+static int slurp(file_system *fs, const char * filename, char * buf, size_t size) {
+
+    directory_entry e;
+    int r = find(fs, filename, &e);
+    if (r == EOK) {
+        if (e.attributes != 0x20) {
+            return EINVALID;
+        }
+
+        fat_device * dev = (fat_device*) fs;
+
+        uint32_t cluster = (e.clusterHigh << 16) + e.clusterLow;
+        uint32_t lba = lbaOfCluster(dev, cluster);
+
+        if (size > e.fileSize) size = e.fileSize;
+
+        if (EOK == (r = dev->store->read_sector(dev->store, lba, buf, size))) {
+            return size;
+        }
+    }
+
+    return r;
+}
+
+static int exists(file_system* fs, const char * filename) {
+    return find(fs, filename, NULL);
+}
+
+
+void init_fat32(storage_device * dev) {
+    fat_device * self = kmem_alloc(sizeof(fat_device));
+    bzero(self, sizeof(fat_device));
+    self->store = dev;
+
+    if (EOK != dev->read_sector(dev, 0, &self->bpb, sizeof(bios_parameter_block) +
+            sizeof(fat32_boot_sector))) {
+        console_print_string("Cannot read \n");
+        goto not_fat;
+    }
+
+    if (0 != memcmp(self->bs.fatTypeLabel, "FAT32", 5)) {
+        goto not_fat;
+    }
+
+    char label[9];
+    strncpy(label, self->bs.label, 8);
+    label[8] = 0;
+
+    console_print_string("Hello from FAT. Label: %s Sector size %d, Cluster size: %d\n",
+            label, self->bpb.bytesPerSector, self->bpb.sectorsPerCluster);
+
+    uint32_t lba = lbaOfCluster(self, self->bs.rootCluster);
+    directory_entry root[16];
+    if (dev->read_sector(dev, lba, &root, sizeof(root))) {
+        console_print_string("Could not read root dir\n");
+        goto not_fat;
+    }
+
+    for (uint16_t i = 0; root[i].name[0] && i < 16; ++i) {
+        if ((unsigned char)root[i].name[0] == 0xe5) continue; // unused
+        if (root[i].attributes == 0xf) continue; // lfn
+
+        char name[13];
+        filenameFromDirectoryEntry(root + i, name, sizeof(name));
+
+        console_print_string("Root entry. flags %x ", root[i].attributes);
         console_print_string(" name %s\n", name);
     }
-};
+
+    self->fs.exists = exists;
+    self->fs.slurp = slurp;
+    register_fs(&self->fs);
+    return;
+
+not_fat:
+    kmem_free(self);
+    return;
+
+}
 

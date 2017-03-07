@@ -6,7 +6,7 @@ void bump(void* user) {
     (*(int*)user) ++;
 }
 
-void runSomeTasks() {
+TEST(runSomeTasks) {
     int bumpCount = 0;
     uint32_t start = kmem_current_objects();
 
@@ -37,7 +37,7 @@ void runSomeTasks() {
     ASSERT("no leaks", start == kmem_current_objects());
 }
 
-void tasksDontDoubleQueue() {
+TEST(tasksDontDoubleQueue) {
     int bumpCount = 0;
     uint32_t start = kmem_current_objects();
 

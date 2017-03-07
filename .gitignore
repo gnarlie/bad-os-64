@@ -10,3 +10,5 @@ tap.pcap
 tcpdump.pid
 .ycm_extra_conf.*
 serial.out
+fat32.img
+ne2k-pktlog.txt

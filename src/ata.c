@@ -1,4 +1,6 @@
 #include "ata.h"
+#include "fs/vfs.h"
+#include "fs/fat32.h"
 #include "console.h"
 
 typedef enum AtaStatus {
@@ -27,6 +29,7 @@ typedef enum MasterOrSlave {
 } MasterOrSlave;
 
 typedef struct AtaDevice {
+    storage_device vtable;
     uint8_t bus;
     uint16_t base;
     uint16_t ctrl;
@@ -37,21 +40,23 @@ typedef struct AtaDevice {
     uint64_t lba48Sectors;
 } AtaDevice;
 
-AtaDevice devices[] = {
-    {.bus = 0, .base = 0x1f0, .ctrl=0x3f6, .ms = Master},
-    {.bus = 0, .base = 0x1f0, .ctrl=0x3f6, .ms = Slave},
-    {.bus = 1, .base = 0x170, .ctrl=0x3f6, .ms = Master},
-    {.bus = 1, .base = 0x170, .ctrl=0x3f6, .ms = Slave},
-    {.bus = 2, .base = 0x1e8, .ctrl=0x3f6, .ms = Master},
-    {.bus = 2, .base = 0x1e8, .ctrl=0x3f6, .ms = Slave},
-    {.bus = 3, .base = 0x168, .ctrl=0x3f6, .ms = Master},
-    {.bus = 3, .base = 0x168, .ctrl=0x3f6, .ms = Slave},
+static int read_sector(storage_device * self, uint64_t lba, void * buf, size_t sz);
+
+static AtaDevice possible_devices[] = {
+    {.vtable = {read_sector}, .bus = 0, .base = 0x1f0, .ctrl=0x3f6, .ms = Master},
+    {.vtable = {read_sector}, .bus = 0, .base = 0x1f0, .ctrl=0x3f6, .ms = Slave},
+    {.vtable = {read_sector}, .bus = 1, .base = 0x170, .ctrl=0x3f6, .ms = Master},
+    {.vtable = {read_sector}, .bus = 1, .base = 0x170, .ctrl=0x3f6, .ms = Slave},
+    {.vtable = {read_sector}, .bus = 2, .base = 0x1e8, .ctrl=0x3f6, .ms = Master},
+    {.vtable = {read_sector}, .bus = 2, .base = 0x1e8, .ctrl=0x3f6, .ms = Slave},
+    {.vtable = {read_sector}, .bus = 3, .base = 0x168, .ctrl=0x3f6, .ms = Master},
+    {.vtable = {read_sector}, .bus = 3, .base = 0x168, .ctrl=0x3f6, .ms = Slave},
 };
 
 // Use ATA PIO. Consider switching to DMA at some point
-int readSector(uint64_t lba, void * buf, size_t sz) {
+int read_sector(storage_device * self, uint64_t lba, void * buf, size_t sz) {
     // hardcoded device for now
-    AtaDevice * dev = &devices[1];
+    AtaDevice * dev = (AtaDevice*) self;
 
     uint8_t status = inb(dev->base + CommandStatus);
     if ((status & ERR) || (status & DRQ) || (status & BSY)) {
@@ -83,6 +88,8 @@ int readSector(uint64_t lba, void * buf, size_t sz) {
         uint16_t data = inw(dev->base + Data);
         dst[x++] = data;
     }
+
+    return 0;
 }
 
 static int identify(AtaDevice * dev) {
@@ -148,10 +155,11 @@ static int identify(AtaDevice * dev) {
 
 void init_ata() {
     for(int i = 0; i < 8; ++i) {
-        AtaDevice * dev = devices + i;
+        AtaDevice * dev = possible_devices + i;
         if (identify(dev)) {
             console_print_string("Discovered %s device %d:%d. %d lba48 sectors\n",
                     dev->type, dev->bus, dev->ms, dev->lba48Sectors);
+            init_fat32(&dev->vtable);
         }
     }
 }

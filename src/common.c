@@ -48,6 +48,34 @@ char * strncpy(char* dest, const char *src, size_t n) {
     return dest;
 }
 
+void strrev(char * str, char * end) {
+    while(str < end) {
+        char tmp = *str;
+        *str = *end;
+        *end = tmp;
+
+        ++str;
+        --end;
+    }
+}
+
+void to_str(uint32_t d, char * buff) {
+    if (!d) {
+        buff[0] = '0';
+        buff[1] = 0;
+        return;
+    }
+
+    char * p = buff;
+    for(; d; ++p) {
+        *p = d % 10 + '0';
+        d /= 10;
+    }
+
+    *p = 0;
+    strrev(buff, p-1);
+}
+
 void * memcpy(void * dest, const void * src, size_t n) {
     for (size_t i = 0; i < n; i++) {
         ((char*)dest)[i] = ((char*)src)[i];
@@ -55,9 +83,42 @@ void * memcpy(void * dest, const void * src, size_t n) {
     return dest;
 }
 
+int strncmp(const char * a, const char * b, size_t n) {
+    for( ; *a && *b && n; a++, b++, n--) {
+        if (*a < *b) return -1;
+        if (*a > *b) return 1;
+    }
+
+    if (n && *a) return -1;
+    if (n && *b) return -1;
+
+    return 0;
+}
+
+int memcmp(const void * a, const void *b, size_t n) {
+    const char * ac = a;
+    const char * bc = b;
+    for (; n; --n) {
+        if (*ac < *bc) return -1;
+        if (*ac > *bc) return 1;
+    }
+
+    return 0;
+}
+
 size_t strlen(const char * what) {
     const char * p = what;
     for (; *p; ++p) ;
     return p  - what;
+}
+
+char * strnchr(char * s, int c, size_t n) {
+    while(*s && n) {
+        if (*s == c) return s;
+        s++;
+        n--;
+    }
+
+    return NULL;
 }
 

@@ -5,6 +5,4 @@ enum AtaErrors {
     ERR_BUSY = 1
 };
 
-
-int readSector(uint64_t lba, void * buf, size_t sz);
 void init_ata();

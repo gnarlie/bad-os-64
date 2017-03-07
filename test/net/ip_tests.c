@@ -7,7 +7,7 @@
 
 #include <string.h>
 
-void checksums() {
+TEST(checksums) {
     uint8_t * bytes = tobytes("450038000000000000000000c0a80302c0a80301");
 
     ASSERT_EQUALS(0xfbaa,
@@ -34,7 +34,7 @@ void capture(struct netdevice* dev, sbuff * sbuff) {
     free(reply);
 }
 
-void icmp_ping_replied() {
+TEST(icmp_ping_replied) {
 
     uint8_t *arp = tobytes("000108000604000212c937989189c0a80301b0c420000000c0a80302");
     uint8_t *request = tobytes("45000054d19440004001e1c0c0a80301c0a8030208006bd30eb203a52d771b53000000006f38030000000000101112131415161718191a1b1c1d1e1f202122232425262728292a2b2c2d2e2f3031323334353637");

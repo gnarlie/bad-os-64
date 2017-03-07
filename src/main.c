@@ -57,7 +57,7 @@ static void breakpoint(registers_t* regs, void*user) {
 static void protection(registers_t* regs, void*user) {
     if (user)
         console_print_string("gpf\n");
-    else 
+    else
         console_print_string("pf\n");
     dump_regs(regs);
     panic("cannot continue");
@@ -204,12 +204,12 @@ void user_mode() {
 void init_syscall();
 
 void user_task(void * fn) {
-    read_rtc();
     call_user_function(fn);
 }
 
-extern void init_fat32();
 extern void init_ata();
+
+#include "fs/vfs.h"
 
 void main() {
     console_print_string("Hello from C\n");
@@ -239,13 +239,6 @@ void main() {
     register_interrupt_handler(0xe, protection, (void*)1);
 
     init_ata();
-    init_fat32();
-
-    // try a breakpoint
-    //uint64_t here;
-    //asm volatile ("lea (%%rip), %0" : "=r" (here) );
-    //asm volatile ("int $3" );
-    //console_print_string("breakpoint was just after: %p\n", here);
 
     //enable the timer and display a clock
     Task * update_task = task_alloc(user_task, update_clock);
@@ -253,6 +246,15 @@ void main() {
     register_interrupt_handler(IRQ0, timer_irq, update_task);
 
     init_http();
+
+    char buf[256];
+    bzero(buf, sizeof(buf));
+    int r = read("MOD.TXT", buf, sizeof(buf));
+    if (r < 0)
+        console_print_string("Cannot read mod.txt: %d\n", r);
+    else
+        console_print_string("MOTD: %s", buf);
+
 
     call_user_function(user_mode);
 }
