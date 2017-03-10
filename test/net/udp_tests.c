@@ -31,6 +31,7 @@ TEST(udp_echo) {
     udp_datagram(&dev, request, 0xc0a80301);
 
     ASSERT_INT_EQUALS(46, g_len);
+    // 34 is sizeof(ip hdr) + sizeof(eth hdr)
     for (int i = 0; i < g_len - 34; ++i) {
         ASSERT_INT_EQUALS(reply[i], g_data[i+34]);
     }

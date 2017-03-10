@@ -7,7 +7,7 @@ mouse: enabled=0
 clock: sync=both
 cpu: ips=5000000, reset_on_triple_fault=0
 display_library:$DISPLAY_LIBRARY
-ne2k: ioaddr=0x300, irq=9, mac=b0:c4:20:00:00:00, enabled=1, ethmod=vnet, ethdev=/tmp/vdt.ctl
+ne2k: ioaddr=0x300, irq=11, mac=b0:c4:20:00:00:00, enabled=1, ethmod=vnet, ethdev=/tmp/vdt.ctl
 pci: slot3=ne2k
 #debug: action=report
 #magic_break: enabled=1

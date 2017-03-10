@@ -209,7 +209,7 @@ static void initialize(uint8_t intr, uint32_t bar0) {
     self->ip = myIp;
 
     self->iomem = bar0 & ~3;
-    console_print_string("Found ne2k on IRQ %d\n", intr);
+    console_print_string("Found ne2k on IRQ %d with MAC ", intr);
 
     outb(self->iomem, NoDma|Stop);
     outb(DCR, 0x49);  // DCR -> BYTEXFR|NOLOOP|WORD

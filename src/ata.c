@@ -45,20 +45,29 @@ static int read_sector(storage_device * self, uint64_t lba, void * buf, size_t s
 static AtaDevice possible_devices[] = {
     {.vtable = {read_sector}, .bus = 0, .base = 0x1f0, .ctrl=0x3f6, .ms = Master},
     {.vtable = {read_sector}, .bus = 0, .base = 0x1f0, .ctrl=0x3f6, .ms = Slave},
-    {.vtable = {read_sector}, .bus = 1, .base = 0x170, .ctrl=0x3f6, .ms = Master},
-    {.vtable = {read_sector}, .bus = 1, .base = 0x170, .ctrl=0x3f6, .ms = Slave},
-    {.vtable = {read_sector}, .bus = 2, .base = 0x1e8, .ctrl=0x3f6, .ms = Master},
-    {.vtable = {read_sector}, .bus = 2, .base = 0x1e8, .ctrl=0x3f6, .ms = Slave},
-    {.vtable = {read_sector}, .bus = 3, .base = 0x168, .ctrl=0x3f6, .ms = Master},
-    {.vtable = {read_sector}, .bus = 3, .base = 0x168, .ctrl=0x3f6, .ms = Slave},
+    {.vtable = {read_sector}, .bus = 1, .base = 0x170, .ctrl=0x376, .ms = Master},
+    {.vtable = {read_sector}, .bus = 1, .base = 0x170, .ctrl=0x376, .ms = Slave},
+    {.vtable = {read_sector}, .bus = 2, .base = 0x1e8, .ctrl=0x3e6, .ms = Master},
+    {.vtable = {read_sector}, .bus = 2, .base = 0x1e8, .ctrl=0x3e6, .ms = Slave},
+    {.vtable = {read_sector}, .bus = 3, .base = 0x168, .ctrl=0x366, .ms = Master},
+    {.vtable = {read_sector}, .bus = 3, .base = 0x168, .ctrl=0x366, .ms = Slave},
 };
+
+static int drive_select(AtaDevice * dev) {
+    // select primary master or slave
+    outb(dev->base + DriveHead, dev->ms ? 0xb0 : 0xa0);
+
+    inb(dev->ctrl);
+    inb(dev->ctrl);
+    inb(dev->ctrl);
+    inb(dev->ctrl);
+    return inb(dev->ctrl);
+}
 
 // Use ATA PIO. Consider switching to DMA at some point
 int read_sector(storage_device * self, uint64_t lba, void * buf, size_t sz) {
-    // hardcoded device for now
     AtaDevice * dev = (AtaDevice*) self;
-
-    uint8_t status = inb(dev->base + CommandStatus);
+    uint8_t status = drive_select(dev);
     if ((status & ERR) || (status & DRQ) || (status & BSY)) {
         // device error
         return ERR_BUSY;
@@ -82,6 +91,11 @@ int read_sector(storage_device * self, uint64_t lba, void * buf, size_t sz) {
 
     outb(dev->base + CommandStatus, 0x24); // 0x24 == read sectors ext
 
+    status = inb(dev->base + CommandStatus);
+    while (status & BSY) {
+        status = inb(dev->base + CommandStatus);
+    }
+
     uint16_t * dst = buf;
     size_t x = 0;
     while(x < sz / 2) {
@@ -94,10 +108,10 @@ int read_sector(storage_device * self, uint64_t lba, void * buf, size_t sz) {
 
 static int identify(AtaDevice * dev) {
     uint8_t status = inb(dev->base + CommandStatus);
-    if (status == 0xff) return 0;
+    if (status == 0xff) return 0; // floating bus -> no device
 
-    // select primary master or slave
-    outb(dev->base + DriveHead, dev->ms ? 0xb0 : 0xa0);
+    // select the correct bus & master/slave
+    drive_select(dev);
 
     outb(dev->base + SectorLBAlo, 0);
     outb(dev->base + CylinderLowLBAmid, 0);
@@ -106,14 +120,16 @@ static int identify(AtaDevice * dev) {
     // identify
     outb(dev->base + CommandStatus, 0xec);
 
-    status = inb(dev->base + CommandStatus);
     uint8_t sigLow = inb(dev->base + CylinderLowLBAmid);
     uint8_t sigHigh = inb(dev->base + CylinderHighLBAhi);
+
+    if (sigLow == 0 && sigHigh == 0) dev->type = "ATA";
+    if (sigLow == 0x14 && sigHigh == 0xeb) dev->type = "ATAPI";
+    if (sigLow == 0x69 && sigHigh == 0x96) dev->type = "SATAPI";
+    if (sigLow == 0x3c && sigHigh == 0xc3) dev->type = "SATA";
+
+    status = inb(dev->base + CommandStatus);
     if (status) {
-        if (sigLow == 0 && sigHigh == 0) dev->type = "ATA";
-        if (sigLow == 0x14 && sigHigh == 0xeb) dev->type = "ATAPI";
-        if (sigLow == 0x69 && sigHigh == 0x96) dev->type = "SATAPI";
-        if (sigLow == 0x3c && sigHigh == 0xc3) dev->type = "SATA";
 
         // wait for BSY clear
         while(status & BSY) {
@@ -137,7 +153,7 @@ static int identify(AtaDevice * dev) {
             ident[i] = inw(dev->base + Data);
         }
 
-        dev->lba48 = (uint32_t)ident[83] & 0x400;
+        dev->lba48 = (((uint32_t)ident[83]) & 0x400) != 0;
         dev->lba28Sectors =
             ident[60] |
             ((uint32_t)ident[61] << 16);
@@ -156,7 +172,7 @@ static int identify(AtaDevice * dev) {
 void init_ata() {
     for(int i = 0; i < 8; ++i) {
         AtaDevice * dev = possible_devices + i;
-        if (identify(dev)) {
+        if (identify(dev) && dev->lba48) {
             console_print_string("Discovered %s device %d:%d. %d lba48 sectors\n",
                     dev->type, dev->bus, dev->ms, dev->lba48Sectors);
             init_fat32(&dev->vtable);

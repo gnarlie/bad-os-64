@@ -14,3 +14,8 @@ To run inside bochs, just use:
 
     make run
 
+To run inside QEMU, just use:
+
+    qemu-system-x86_64 --readconfig etc/qemu.cfg
+
+

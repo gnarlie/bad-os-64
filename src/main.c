@@ -67,10 +67,11 @@ static void update_clock(void* unused) {
     static uint32_t time;
     uint32_t now = gettime();
 
+    char * clock = (char*) 0xb8000 + 2 * (80 - 8);
+
     if (time != now) {
         time = now;
 
-        char * clock = (char*) 0xb8000 + 2 * (80 - 8);
         uint32_t hr = time / 3600;
         clock[0] = (hr / 10) + '0';
         clock[2] = (hr % 10) + '0';
@@ -86,7 +87,9 @@ static void update_clock(void* unused) {
 }
 
 void timer_irq(registers_t* regs, void *update_task) {
+    read_rtc();
     task_enqueue((Task*)update_task);
+    char * clock = (char*) 0xb8000 + 2 * (80 - 8);
 }
 
 struct gdt_entry {
