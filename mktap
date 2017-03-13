@@ -1,0 +1,5 @@
+ip tuntap add dev tap0 mode tap user $SUDO_USER
+ip link set dev tap0 up
+ip addr add 192.168.3.1/24 dev tap0
+
+# sudo ip tuntap delete dev tap0

@@ -103,6 +103,12 @@ int read_sector(storage_device * self, uint64_t lba, void * buf, size_t sz) {
         dst[x++] = data;
     }
 
+    status = inb(dev->base + CommandStatus);
+    while (status & DRQ) {
+        status = inb(dev->base + CommandStatus);
+        inw(dev->base + Data);
+    }
+
     return 0;
 }
 

@@ -7,8 +7,6 @@
 static void http_read(stream * stream, const uint8_t* request, uint32_t size) {
     // console_print_string((const char*)request);
 
-    //const char* response =  "HTTP/1.1 200 OK\r\nContent-Type: text/html\r\nContent-Length: 26\r\n\r\n<html>Bad-OS 64</html>\r\n\r\n";
-    // tcp_send(stream, response, strlen(response));
     const char* h1 =  "HTTP/1.1 200 OK\r\nContent-Type: text/html\r\nContent-Length: ";
     const char* h2 =  "\r\n\r\n";
 
