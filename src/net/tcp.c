@@ -112,6 +112,8 @@ static void header_from_stream(stream* stream, tcp_hdr* hdr, uint8_t flags) {
     hdr->window = ntos(stream->readMax - stream->readOffset);
     hdr->flags = flags | (stream->needsAck ? Ack : 0);
     hdr->chksum = 0;
+
+    stream->needsAck = 0;
 }
 
 static void reset_stream(struct netdevice *dev, tcp_hdr* hdr, uint32_t srcIp) {
@@ -144,7 +146,7 @@ static void connected(struct netdevice *dev,
     s->remoteAddr = remoteAddr;
     s->localSeq = localSeq;
     s->ackSeq = ackSeq + 1;
-    s->needsAck = 1;
+    s->needsAck = 0;
     s->state = SynReceived;
 
     s->readFn = fn;
@@ -173,7 +175,18 @@ static void acked(stream * stream, tcp_hdr* hdr) {
     }
 
     if (stream->state == SynReceived) stream->state = Established;
+    if (stream->state == FinWait1) stream->state = FinWait2;
     if (stream->state == LastAck) remove_stream(stream);
+}
+
+void tcp_close(stream *stream) {
+    sbuff * sb = ip_sbuff_alloc(sizeof(tcp_hdr));
+    tcp_hdr * response = (tcp_hdr*) sb->head;
+    header_from_stream(stream, response, Fin);
+    stream->state = FinWait1;
+
+    tcp_checksum(sb, sizeof(*response), stream->dev->ip, stream->remoteAddr);
+    ip_send(sb, IPPROTO_TCP, stream->remoteAddr, stream->dev);
 }
 
 void tcp_send(stream *stream, const void* data, uint16_t sz) {
@@ -206,6 +219,7 @@ static void buffer_data(struct netdevice* dev, tcp_hdr *hdr,
     const uint8_t* data = (const uint8_t*)hdr + 4 * hdr->offset;
     memcpy(stream->readBuf + stream->readOffset, data, len);
     stream->readOffset += len;
+    stream->needsAck = 1;
 }
 
 static void pushit(stream * stream) {
@@ -213,18 +227,42 @@ static void pushit(stream * stream) {
     stream->readOffset = 0;
 }
 
-static void fin(struct netdevice * dev, stream * s) {
-    // send a fin/ack ... we're assuming the 'application'
-    // has no more data, otherwise we'd need to Ack, wait for
-    // upper layer to shutdown/close, then Fin
-    sbuff * sb = ip_sbuff_alloc(sizeof(tcp_hdr));
-    tcp_hdr * response = (tcp_hdr*) sb->head;
-    s->ackSeq++;
-    header_from_stream(s, response, Fin | Ack);
+static void time_wait(stream* stream) {
+    // TODO ... schedule this for 2ms from now
 
-    tcp_checksum(sb, sizeof(*response), dev->ip, s->remoteAddr);
-    ip_send(sb, IPPROTO_TCP, s->remoteAddr, dev);
-    s->state = LastAck;
+    remove_stream(stream);
+}
+
+static void fin(struct netdevice * dev, stream * s) {
+    if (s->state == FinWait2) {
+        // ack their fin
+        sbuff * sb = ip_sbuff_alloc(sizeof(tcp_hdr));
+        tcp_hdr * response = (tcp_hdr*) sb->head;
+        s->ackSeq++;
+        header_from_stream(s, response, Ack);
+
+        tcp_checksum(sb, sizeof(*response), dev->ip, s->remoteAddr);
+        ip_send(sb, IPPROTO_TCP, s->remoteAddr, dev);
+        s->state = TimeWait;
+
+        time_wait(s);
+    }
+    else if (s->state == Established) {
+        // send a fin/ack ... we're assuming the 'application'
+        // has no more data, otherwise we'd need to Ack, wait for
+        // upper layer to shutdown/close, then Fin.
+        //
+        // But skip all that and the CloseWait state. Go straight to LastAck
+        //
+        sbuff * sb = ip_sbuff_alloc(sizeof(tcp_hdr));
+        tcp_hdr * response = (tcp_hdr*) sb->head;
+        s->ackSeq++;
+        header_from_stream(s, response, Fin | Ack);
+
+        tcp_checksum(sb, sizeof(*response), dev->ip, s->remoteAddr);
+        ip_send(sb, IPPROTO_TCP, s->remoteAddr, dev);
+        s->state = LastAck;
+    }
 }
 
 static stream * find(struct netdevice *local, uint32_t src, tcp_hdr* hdr) {
@@ -242,6 +280,7 @@ static stream * find(struct netdevice *local, uint32_t src, tcp_hdr* hdr) {
 
     return NULL;
 }
+
 
 static void syn(struct netdevice * dev, tcp_hdr *hdr, uint32_t srcIp) {
     uint16_t dst = ntos(hdr->destPort);
@@ -276,6 +315,7 @@ int listen(uint16_t port, tcp_read_fn (*accept)()) {
 
     return EOK;
 }
+
 
 void tcp_segment(struct netdevice *dev, const uint8_t* data, uint32_t sz, uint32_t srcIp) {
     tcp_hdr * hdr = (tcp_hdr*)data;

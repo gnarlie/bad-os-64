@@ -25,6 +25,7 @@ static void http_read(stream * stream, const uint8_t* request, uint32_t size) {
     tcp_send(stream, h2, strlen(h2));
     tcp_send(stream, body, count);
     tcp_send(stream, h2, strlen(h2));
+    tcp_close(stream);
 }
 
 static tcp_read_fn http_accept(stream * stream) {

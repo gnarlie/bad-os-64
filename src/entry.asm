@@ -21,7 +21,7 @@ USE64
 
 
 start:
-    mov rsp, 0x18000
+    mov rsp, 0x18000            ; move this elsewhere
     call console_clear_screen
     mov rdi, hello_message
     call console_print_string
@@ -318,7 +318,6 @@ ISR 31
 lastStack     dq 0
 stack_differs db `Stack pointer has changed\n`, 0
 hello_message db `Hello, World\n`, 0
-hello_message_2 db `Hello, World from Kernel %p\n`, 0
 pct_p         db `here: %p\n`, 0
 gdtr64        dw 0
               dq 0x0000000000001000

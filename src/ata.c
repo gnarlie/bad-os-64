@@ -42,7 +42,7 @@ typedef struct AtaDevice {
 
 static int read_sector(storage_device * self, uint64_t lba, void * buf, size_t sz);
 
-static AtaDevice possible_devices[] = {
+AtaDevice possible_devices[] = {
     {.vtable = {read_sector}, .bus = 0, .base = 0x1f0, .ctrl=0x3f6, .ms = Master},
     {.vtable = {read_sector}, .bus = 0, .base = 0x1f0, .ctrl=0x3f6, .ms = Slave},
     {.vtable = {read_sector}, .bus = 1, .base = 0x170, .ctrl=0x376, .ms = Master},

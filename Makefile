@@ -1,4 +1,4 @@
-CFLAGS=-Os -nostdlib -nostdinc -fno-builtin -fno-stack-protector -std=gnu99  -MMD -MP -g -Werror -mno-red-zone -I src 
+CFLAGS=-Os -nostdlib -nostdinc -fno-builtin -fno-stack-protector -std=gnu99  -MMD -MP -g -Werror -mno-red-zone -I src -fno-asynchronous-unwind-tables
 TEST_CFLAGS=-std=gnu99 -Werror -MMD -MP -I src
 DISPLAY_LIBRARY ?= sdl
 
@@ -39,16 +39,13 @@ out/test/%.o: test/%.c
 	$(CC) -c $(TEST_CFLAGS) -o $@ $<
 
 kernel.sys: $(OBJS) Pure64/pure64.sys
-	ld  -Map=kernel.sym -Tsrc/kernel.ld -melf_x86_64 -o /tmp/kernel $(OBJS) 
+	ld  -Map=kernel.sym -Tsrc/kernel.ld -o /tmp/kernel $(OBJS) 
 	cat Pure64/pure64.sys /tmp/kernel > kernel.sys
 
 Pure64/bmfs_mbr.sys Pure64/pure64.sys:
 	cd Pure64 && ./build.sh
 
-	cd Pure64 && ./build.sh
-
 disk.img: Pure64/bmfs_mbr.sys kernel.sys
-	cat  $^ > /tmp/kernel
 	./createimage.sh disk.img 1 Pure64/bmfs_mbr.sys kernel.sys
 
 fat32.img: image/*

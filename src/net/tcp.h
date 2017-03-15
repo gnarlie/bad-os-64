@@ -25,4 +25,5 @@ typedef void (*tcp_read_fn)(stream*, const uint8_t*, uint32_t);
 
 int listen(uint16_t port, tcp_read_fn (*accept)(stream*));
 void tcp_send(stream *stream, const void* data, uint16_t sz);
+void tcp_close(stream *stream);
 

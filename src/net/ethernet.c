@@ -20,7 +20,7 @@ inline static void assign(mac dest, const mac src) {
     memcpy(dest, src, 6);
 }
 
-void ethernet_send(sbuff* sbuff, uint16_t proto, mac dest, struct netdevice* device) {
+void ethernet_send(sbuff* sbuff, uint16_t proto, const mac dest, struct netdevice* device) {
     sbuff_pop(sbuff, sizeof(struct ethernet_frame));
     struct ethernet_frame* frame = (struct ethernet_frame*) sbuff->head;
     assign(frame->destination, dest);

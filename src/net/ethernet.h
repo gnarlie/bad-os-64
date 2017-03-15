@@ -12,5 +12,5 @@ struct ethernet_frame {
 } __attribute__ ((packed));
 
 void ethernet_packet(struct netdevice * device, const uint8_t *packet);
-void ethernet_send(sbuff* sbuff, uint16_t proto, mac dest, struct netdevice* device);
+void ethernet_send(sbuff* sbuff, uint16_t proto, const mac dest, struct netdevice* device);
 sbuff * ethernet_sbuff_alloc(uint16_t size);

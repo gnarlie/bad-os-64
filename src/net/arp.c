@@ -4,7 +4,7 @@
 #include "net/ntox.h"
 #include "net/ethernet.h"
 
-static mac BROADCAST_MAC = {0xff, 0xff, 0xff, 0xff, 0xff, 0xff};
+static const mac BROADCAST_MAC = {0xff, 0xff, 0xff, 0xff, 0xff, 0xff};
 
 struct arp_packet {
     uint16_t htype;
