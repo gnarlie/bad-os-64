@@ -4,6 +4,7 @@
 #include "net/arp.h"
 #include "net/ntox.h"
 
+
 #include "../tinytest/tinytest.h"
 
 #include <stdio.h>
@@ -116,12 +117,7 @@ TEST(active_close) {
     tcp_packet syn = {
         .hdr = {
             .srcPort = 1000, .destPort = ntos(80),
-            .sequence=1, .ack=0,
-            .offset = 4, .flags = 2 } };
-
-    tcp_packet ack = syn;
-    ack.hdr.flags = 0x18;
-    ack.hdr.sequence++;
+            .sequence=ntol(1), .ack=0, .offset = 5, .flags = 2 } };
 
     struct netdevice dev = {.ip =  0xC0A80302, .send=capture};
 
@@ -131,13 +127,30 @@ TEST(active_close) {
     tcp_segment(&dev, syn.bytes, sizeof(tcp_hdr), 0xc0a80301);
     ASSERT_INT_EQUALS(0x12, g_recv->flags); // ack,syn
     ASSERT_INT_EQUALS(ntos(80), g_recv->srcPort);
+    ASSERT_INT_EQUALS(ntol(2), g_recv->ack);
 
     cleanup();
-    tcp_segment(&dev, (const uint8_t*) &ack, sizeof(tcp_hdr) + 1, 0xc0a80301);
+
+    tcp_packet ack = syn;
+    ack.hdr.flags = 0x18; // ack + psh, w/ no data
+    ack.hdr.sequence = ntol(2);
+
+    tcp_segment(&dev, (const uint8_t*) &ack, sizeof(tcp_hdr), 0xc0a80301);
     ASSERT_EQUALS(g_recv, NULL);
 
     tcp_close(last);
-    ASSERT_INT_EQUALS(0x11, g_recv->flags); // ack the psh + fin
+    ASSERT_INT_EQUALS(0x1, g_recv->flags); //  fin
+    ASSERT_INT_EQUALS(ntol(2), g_recv->ack);
+
+    tcp_packet finack = ack;
+    finack.hdr.flags = 0x11; // ack, fin
+    finack.hdr.ack = g_recv->sequence;
+    finack.hdr.sequence = ntol(3);
+
+    tcp_segment(&dev, finack.bytes, sizeof(tcp_hdr), 0xc0a80301);
+
+    ASSERT_INT_EQUALS(0x10, g_recv->flags); // ack
+    ASSERT_INT_EQUALS(ntol(3), g_recv->ack);
 
     cleanup();
 }

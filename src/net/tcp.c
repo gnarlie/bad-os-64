@@ -187,6 +187,7 @@ void tcp_close(stream *stream) {
 
     tcp_checksum(sb, sizeof(*response), stream->dev->ip, stream->remoteAddr);
     ip_send(sb, IPPROTO_TCP, stream->remoteAddr, stream->dev);
+    stream->localSeq ++;
 }
 
 void tcp_send(stream *stream, const void* data, uint16_t sz) {

@@ -34,5 +34,5 @@ void warn(const char * what);
 #define add_ref(thing) (thing)->refs++
 #define release_ref(thing, free) if (--(thing->refs) == 0) {free(thing);}
 
-void to_str(uint32_t d, char * buff);
+char * to_str(uint32_t d, char * buff);
 

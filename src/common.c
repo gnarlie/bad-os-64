@@ -59,11 +59,11 @@ void strrev(char * str, char * end) {
     }
 }
 
-void to_str(uint32_t d, char * buff) {
+char* to_str(uint32_t d, char * buff) {
     if (!d) {
         buff[0] = '0';
         buff[1] = 0;
-        return;
+        return buff + 2;
     }
 
     char * p = buff;
@@ -74,6 +74,7 @@ void to_str(uint32_t d, char * buff) {
 
     *p = 0;
     strrev(buff, p-1);
+    return p;
 }
 
 void * memcpy(void * dest, const void * src, size_t n) {

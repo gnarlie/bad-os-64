@@ -8,6 +8,7 @@ TEST(convertShorts) {
 }
 
 TEST(convertInts) {
+    ASSERT_EQUALS(0x01000000, ntol(1));
     ASSERT_EQUALS(0xa8c00203, ntol(0x0302c0a8));
 }
 
