@@ -8,7 +8,13 @@ static char *current = (char*) 0xB8000;
 static const uint16_t lines = 25;
 static const uint16_t cols = 160; // in bytes, 80 columns
 
+static enum Color current_color = Black << 4 | Gray;
+
 typedef unsigned long ptrdiff_t;
+
+void console_set_color(enum Color fore, enum Color back) {
+    current_color = back << 4 | fore;
+}
 
 static char hex(int i) {
     if (i > 16) return '?';
@@ -28,6 +34,7 @@ void scroll() {
     char * lastLine = VideoStart + (lines - 1) * cols;
     for(int i = 0; i < cols; i+=2) {
         lastLine[i] = ' ';
+        lastLine[i + 1] = current_color;
     }
 
     current -= cols;
@@ -63,9 +70,11 @@ void console_put(char c) {
             if (current < VideoStart)
                 current = VideoStart;
             *current = ' ';
+            current[1] = current_color;
             break;
         default:
             *current = c;
+            current[1] = current_color;
             current += 2;
     }
 

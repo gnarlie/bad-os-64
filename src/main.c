@@ -215,7 +215,9 @@ extern void init_ata();
 #include "fs/vfs.h"
 
 void main() {
-    console_print_string("Hello from C\n");
+    console_set_color(Green, Black);
+    console_print_string("BadOS-64\n");
+    console_set_color(Gray, Black);
 
     init_interrupts();
     init_gdt();
@@ -225,7 +227,7 @@ void main() {
 
     uint32_t ram = *(uint32_t*)0x5020;
     uint16_t cpuSpeed = *(uint16_t*)0x5010;
-    console_print_string("System RAM: %d MB. CPU Speed: %d MHz\n",
+    console_print_string("\nSystem RAM: %d MB. CPU Speed: %d MHz\n\n",
             ram, cpuSpeed);
 
     // TODO need to make these less arbiratry, based on the
