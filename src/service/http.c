@@ -39,7 +39,7 @@ static tcp_read_fn http_accept(stream * stream) {
 }
 
 static void http_run() {
-    if (EOK != listen(80, http_accept)) {
+    if (EOK != tcp_listen(80, http_accept)) {
         console_print_string("Failed to listen on port 80\n");
     }
 }

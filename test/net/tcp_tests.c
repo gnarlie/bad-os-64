@@ -66,7 +66,7 @@ TEST(connection_synack) {
     syn = tobyteslen("c7780050ee75886200000000a00272109ec30000020405b40402080a04316d060000000001030307");
     struct netdevice dev = {.ip =  0xC0A80302, .send=capture};
 
-    listen(80, accept);
+    tcp_listen(80, accept);
 
     dev.send = capture;
     arp_store(remote, 0xc0a80301);
@@ -94,7 +94,7 @@ TEST(passive_close) {
 
     struct netdevice dev = {.ip =  0xC0A80302, .send=capture};
 
-    listen(80, accept);
+    tcp_listen(80, accept);
 
     arp_store(remote, 0xc0a80301);
     tcp_segment(&dev, syn.bytes, sizeof(tcp_hdr), 0xc0a80301);
@@ -121,7 +121,7 @@ TEST(active_close) {
 
     struct netdevice dev = {.ip =  0xC0A80302, .send=capture};
 
-    listen(80, accept);
+    tcp_listen(80, accept);
 
     arp_store(remote, 0xc0a80301);
     tcp_segment(&dev, syn.bytes, sizeof(tcp_hdr), 0xc0a80301);

@@ -7,6 +7,8 @@
 #include "net/tcp.h"
 #include "net/sbuff.h"
 
+#include "errno.h"
+
 #include "console.h"
 
 struct ipv4_header {
@@ -25,11 +27,15 @@ struct ipv4_header {
     uint32_t dest;
 } __attribute__ ((packed));
 
+static struct netdevice * the_device; // TODO collection
+
 static void console_put_ip(uint32_t ip) {
-    console_put_dec(ip >> 24 & 0xff);
-    console_put_dec(ip >> 16 & 0xff); console_print_string(".");
-    console_put_dec(ip >> 8 & 0xff); console_print_string(".");
-    console_put_dec(ip & 0xff); console_print_string(".");
+    console_print_string("%d.%d.%d.%d",
+            ip >> 24 & 0xff,
+            ip >> 16 & 0xff,
+            ip >> 8 & 0xff,
+            ip & 0xff
+            );
 }
 
 sbuff* ip_sbuff_alloc(uint16_t size) {
@@ -73,7 +79,7 @@ void icmp_segment(uint32_t sender, struct netdevice* dev, const uint8_t* data, u
     }
 }
 
-void ip_send(sbuff* sbuff, uint8_t proto, uint32_t dest, struct netdevice* device) {
+int ip_send(sbuff* sbuff, uint8_t proto, uint32_t dest, struct netdevice* device) {
     sbuff_pop(sbuff, sizeof(struct ipv4_header));
     uint16_t len = sbuff->currSize;
     struct ipv4_header *hdr = (struct ipv4_header*)sbuff->head;
@@ -94,11 +100,18 @@ void ip_send(sbuff* sbuff, uint8_t proto, uint32_t dest, struct netdevice* devic
     static mac destMac;
     if (arp_lookup(device, dest, destMac)) {
         ethernet_send(sbuff, 0x0800u, destMac, device);
+        return EOK;
     }
+
+    return ENOTFOUND;
 }
 
 void ip_packet(struct netdevice* dev, const uint8_t* data) {
     struct ipv4_header* ip = (struct ipv4_header*) data;
+
+    if (the_device == NULL) {
+        the_device = dev;
+    }
 
     uint16_t hdrLen = ip->ihl * 4;
     switch(ip->proto) {
@@ -124,3 +137,11 @@ void ip_packet(struct netdevice* dev, const uint8_t* data) {
     }
 }
 
+void ip_add_device(struct netdevice * dev) {
+    the_device = dev;
+}
+
+struct netdevice * ip_resolve_local(uint32_t addr) {
+    if (ntol(the_device->ip) == addr) return the_device;
+    return NULL;
+}

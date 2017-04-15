@@ -301,7 +301,7 @@ static void syn(struct netdevice * dev, tcp_hdr *hdr, uint32_t srcIp) {
     }
 }
 
-int listen(uint16_t port, tcp_read_fn (*accept)()) {
+int tcp_listen(uint16_t port, tcp_read_fn (*accept)()) {
     listen_state * l = all_listeners;
     while(l) {
         if (l->port == port) return EADDRINUSE;

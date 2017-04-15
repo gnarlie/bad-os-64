@@ -8,6 +8,7 @@
 #include "pci.h"
 #include "ne2k.h"
 #include "service/http.h"
+#include "service/echo.h"
 
 void call_user_function(void*);
 
@@ -251,6 +252,7 @@ void main() {
     register_interrupt_handler(IRQ0, timer_irq, update_task);
 
     init_http();
+    init_echo();
 
     char buf[256];
     bzero(buf, sizeof(buf));

@@ -187,6 +187,8 @@ static void send_sync(void * user) {
     outb(TSTART, tx_start_page);
     outb(IMR, ImrAllIsr);
     outb(self->iomem, NoDma|Transmit|Start);
+
+    release_ref(send->data, sbuff_free);
 }
 
 static void ne2k_send(struct netdevice * dev, sbuff * sbuff) {

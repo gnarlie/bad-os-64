@@ -9,11 +9,14 @@ struct sbuff_t;
 #define IPPROTO_TCP 6
 
 void ip_packet(struct netdevice* dev, const uint8_t* data);
-void ip_send(struct sbuff_t* sbuff, uint8_t proto, uint32_t dest, struct netdevice *);
+int ip_send(struct sbuff_t* sbuff, uint8_t proto, uint32_t dest, struct netdevice *);
 struct sbuff_t* ip_sbuff_alloc(uint16_t sz);
 
+struct netdevice * ip_resolve_local(uint32_t addr);
+void ip_add_device(struct netdevice * dev);
+
 static inline uint16_t checksum(const void *buf, uint32_t len, uint16_t* dest) {
-    const uint8_t* data= (const char*)buf;
+    const uint8_t* data= (const uint8_t*)buf;
     uint32_t sum = 0;
     *dest = 0;
 
