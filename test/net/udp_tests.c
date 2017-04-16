@@ -45,6 +45,7 @@ TEST(udp_send) {
     ASSERT_INT_EQUALS(46, g_len);
 
     free(reply);
+    free(g_data);
 }
 
 TEST(udp_listen) {
@@ -66,4 +67,5 @@ TEST(udp_listen) {
     ASSERT_INT_EQUALS(0xc0a80301, g_quad.src_addr);
 
     free(request);
+    free(g_data);
 }

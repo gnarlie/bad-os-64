@@ -1,5 +1,6 @@
 CFLAGS=-Os -nostdlib -nostdinc -fno-builtin -fno-stack-protector -std=gnu99  -MMD -MP -g -Werror -mno-red-zone -I src -fno-asynchronous-unwind-tables
-TEST_CFLAGS=-std=gnu99 -Werror -MMD -MP -I src
+TEST_CFLAGS=-std=gnu99 -Werror -MMD -MP -I src -g
+
 DISPLAY_LIBRARY ?= sdl
 
 C_FILES=$(shell find src -name '*.c')

@@ -59,6 +59,7 @@ TEST(connection_refused) {
     ASSERT_EQUALS(0x14, g_data[47]); // ack,rst
 
     cleanup();
+    free(syn.bytes);
 }
 
 TEST(connection_synack) {
@@ -77,7 +78,9 @@ TEST(connection_synack) {
     ASSERT_INT_EQUALS(0x0203a8c0, *(uint32_t*)(g_data+26));
     ASSERT_INT_EQUALS(0x0103a8c0, *(uint32_t*)(g_data+30));
     ASSERT_INT_EQUALS(0x12, g_data[47]); // ack,syn
+
     cleanup();
+    free(syn.bytes);
 }
 
 
@@ -147,6 +150,7 @@ TEST(active_close) {
     finack.hdr.ack = g_recv->sequence;
     finack.hdr.sequence = ntol(3);
 
+    cleanup();
     tcp_segment(&dev, finack.bytes, sizeof(tcp_hdr), 0xc0a80301);
 
     ASSERT_INT_EQUALS(0x10, g_recv->flags); // ack
