@@ -29,7 +29,7 @@ static void capture(struct netdevice *dev, sbuff * sbuff) {
 
 
 TEST(udp_send) {
-    struct netdevice dev = {.ip = 9999, .send = capture};
+    struct netdevice dev = {.ip = ntol(9999), .send = capture};
     ip_add_device(&dev);
 
     mac mac;
@@ -38,7 +38,7 @@ TEST(udp_send) {
     uint8_t* reply =   tobytes("deadbeef");
     udp_quad quad = {
         .src_port = 8888, .dst_port = 7,
-        .src_addr = dev.ip, .dst_addr = 0x11223344};
+        .src_addr = 9999, .dst_addr = 0x11223344};
 
     ASSERT_INT_EQUALS(0, udp_send(&quad, reply, 4));
 

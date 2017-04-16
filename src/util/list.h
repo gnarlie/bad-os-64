@@ -14,6 +14,7 @@ typedef struct list {
 } list_t;
 
 list_t list_create();
+void list_destroy(list_t * list);
 list_node * list_append(list_t * list, void * payload);
 void list_remove_node(list_t * list, list_node * node);
 

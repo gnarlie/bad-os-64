@@ -7,6 +7,8 @@
 #include "net/tcp.h"
 #include "net/sbuff.h"
 
+#include "util/map.h"
+
 #include "errno.h"
 
 #include "console.h"
@@ -27,7 +29,7 @@ struct ipv4_header {
     uint32_t dest;
 } __attribute__ ((packed));
 
-static struct netdevice * the_device; // TODO collection
+static struct map_t ip_devices;
 
 static void console_put_ip(uint32_t ip) {
     console_print_string("%d.%d.%d.%d",
@@ -109,9 +111,12 @@ int ip_send(sbuff* sbuff, uint8_t proto, uint32_t dest, struct netdevice* device
 void ip_packet(struct netdevice* dev, const uint8_t* data) {
     struct ipv4_header* ip = (struct ipv4_header*) data;
 
-    if (the_device == NULL) {
-        the_device = dev;
+    // move me to ip_init when there is an ip_init
+    if (ip_devices.data == NULL) {
+        map_init(&ip_devices, map_int_hash);
     }
+
+    map_add(&ip_devices, dev->ip, dev);
 
     uint16_t hdrLen = ip->ihl * 4;
     switch(ip->proto) {
@@ -138,10 +143,9 @@ void ip_packet(struct netdevice* dev, const uint8_t* data) {
 }
 
 void ip_add_device(struct netdevice * dev) {
-    the_device = dev;
+    map_add(&ip_devices, dev->ip, dev);
 }
 
 struct netdevice * ip_resolve_local(uint32_t addr) {
-    if (ntol(the_device->ip) == addr) return the_device;
-    return NULL;
+    return map_lookup(&ip_devices, ntol(addr));
 }

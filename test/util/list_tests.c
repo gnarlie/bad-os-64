@@ -2,8 +2,6 @@
 
 #include "util/list.h"
 
-#include <stdio.h>
-
 TEST(list_append) {
     list_t l = list_create();
     list_node * a = list_append(&l, 0);

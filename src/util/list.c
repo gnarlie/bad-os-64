@@ -5,6 +5,12 @@ list_t list_create() {
     return l;
 }
 
+void list_destroy(list_t *list) {
+    while(list->head) {
+        list_remove_node(list, list->head);
+    }
+}
+
 list_node * list_append(list_t * list, void * payload) {
     list_node * node = kmem_alloc(sizeof(list_node));
     node->payload = payload;
