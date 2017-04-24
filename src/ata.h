@@ -5,4 +5,4 @@ enum AtaErrors {
     ERR_BUSY = 1
 };
 
-void init_ata();
+extern void init_ata();

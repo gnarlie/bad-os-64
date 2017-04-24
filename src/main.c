@@ -2,15 +2,18 @@
 #include "console.h"
 #include "keyboard.h"
 #include "memory.h"
-#include "rtc.h"
 #include "interrupt.h"
 #include "task.h"
 #include "pci.h"
 #include "ne2k.h"
+#include "ata.h"
+#include "entry.h"
+
+#include "fs/vfs.h"
+
 #include "service/http.h"
 #include "service/echo.h"
-
-void call_user_function(void*);
+#include "service/clock.h"
 
 void dump_regs(registers_t* regs) {
     console_print_string("rax %p rbx %p\n", regs->rax, regs->rbx);
@@ -62,35 +65,6 @@ static void protection(registers_t* regs, void*user) {
         console_print_string("pf\n");
     dump_regs(regs);
     panic("cannot continue");
-}
-
-static void update_clock(void* unused) {
-    static uint32_t time;
-    uint32_t now = gettime();
-
-    char * clock = (char*) 0xb8000 + 2 * (80 - 8);
-
-    if (time != now) {
-        time = now;
-
-        uint32_t hr = time / 3600;
-        clock[0] = (hr / 10) + '0';
-        clock[2] = (hr % 10) + '0';
-        clock[4] = ':';
-        uint32_t min = time / 60 % 60;
-        clock[6] = (min / 10) + '0';
-        clock[8] = (min % 10) + '0';
-        clock[10] = ':';
-        uint32_t sec = time % 60;
-        clock[12] = (sec / 10) + '0';
-        clock[14] = (sec % 10) + '0';
-    }
-}
-
-void timer_irq(registers_t* regs, void *update_task) {
-    read_rtc();
-    task_enqueue((Task*)update_task);
-    char * clock = (char*) 0xb8000 + 2 * (80 - 8);
 }
 
 struct gdt_entry {
@@ -191,29 +165,15 @@ static void init_gdt() {
     gdt[5].privLvl = 3;
 
     // gdt[6/7] is the 64bit TSS descriptor
-    create_tss(&gdt[6&7]);
+    create_tss(&gdt[6]);
 
     install_gdt(gdt, sizeof(gdt));
     install_tss();
 }
 
-void syscall(void * fn, void *);
-
-void user_mode() {
+static void user_mode() {
     syscall(console_print_string, "hello from ring 3\n");
-    // TODO - ring 3 interrupt handling:
-    // asm volatile ("int $3" ::: "memory" );
 }
-
-void init_syscall();
-
-void user_task(void * fn) {
-    call_user_function(fn);
-}
-
-extern void init_ata();
-
-#include "fs/vfs.h"
 
 void main() {
     console_set_color(Green, Black);
@@ -246,13 +206,9 @@ void main() {
 
     init_ata();
 
-    //enable the timer and display a clock
-    Task * update_task = task_alloc(user_task, update_clock);
-    add_ref(update_task);
-    register_interrupt_handler(IRQ0, timer_irq, update_task);
-
     init_http();
     init_echo();
+    init_clock();
 
     char buf[256];
     bzero(buf, sizeof(buf));
@@ -261,7 +217,6 @@ void main() {
         console_print_string("Cannot read mod.txt: %d\n", r);
     else
         console_print_string("MOTD: %s", buf);
-
 
     call_user_function(user_mode);
 }

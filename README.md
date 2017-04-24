@@ -15,6 +15,6 @@ To run inside bochs, just use:
     make run
 
 To run inside QEMU, just use:
-
+    sudo ./mktun # create a device for networking - only needs to happen once
     qemu-system-x86_64 --readconfig etc/qemu.cfg
 
