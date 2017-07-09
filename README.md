@@ -18,3 +18,6 @@ To run inside QEMU, just use:
     sudo ./mktun # create a device for networking - only needs to happen once
     qemu-system-x86_64 --readconfig etc/qemu.cfg
 
+or
+    qemu-system-x86_64 --readconfig etc/qemu.cfg --net none --cpu host
+
