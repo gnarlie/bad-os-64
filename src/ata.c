@@ -2,6 +2,7 @@
 #include "fs/vfs.h"
 #include "fs/fat32.h"
 #include "console.h"
+#include "interrupt.h"
 
 typedef enum AtaStatus {
     ERR = 1,
@@ -41,6 +42,7 @@ typedef struct AtaDevice {
 } AtaDevice;
 
 static int read_sector(storage_device * self, uint64_t lba, void * buf, size_t sz);
+
 
 AtaDevice possible_devices[] = {
     {.vtable = {read_sector}, .bus = 0, .base = 0x1f0, .ctrl=0x3f6, .ms = Master},
@@ -175,7 +177,16 @@ static int identify(AtaDevice * dev) {
     return 0;
 }
 
+static void ata_irq_handler(registers_t* regs, void* user) {
+    // TODO -  check status after DMA
+    // console_print_string("%d -irq\n", user);
+}
+
 void init_ata() {
+    // TODO - by bus
+    register_interrupt_handler(14+32, ata_irq_handler, 0);
+    register_interrupt_handler(15+32, ata_irq_handler, (void*)1);
+
     for(int i = 0; i < 8; ++i) {
         AtaDevice * dev = possible_devices + i;
         if (identify(dev) && dev->lba48) {

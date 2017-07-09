@@ -169,16 +169,16 @@ void init_fat32(storage_device * dev) {
         goto not_fat;
     }
 
-    for (uint16_t i = 0; root[i].name[0] && i < 16; ++i) {
-        if ((unsigned char)root[i].name[0] == 0xe5) continue; // unused
-        if (root[i].attributes == 0xf) continue; // lfn
+    //for (uint16_t i = 0; root[i].name[0] && i < 16; ++i) {
+    //    if ((unsigned char)root[i].name[0] == 0xe5) continue; // unused
+    //    if (root[i].attributes == 0xf) continue; // lfn
 
-        char name[13];
-        filenameFromDirectoryEntry(root + i, name, sizeof(name));
+    //    char name[13];
+    //    filenameFromDirectoryEntry(root + i, name, sizeof(name));
 
-        console_print_string("Root entry. flags %x ", root[i].attributes);
-        console_print_string(" name %s\n", name);
-    }
+    //    console_print_string("Root entry. flags %x ", root[i].attributes);
+    //    console_print_string(" name %s\n", name);
+    //}
 
     self->fs.exists = exists;
     self->fs.slurp = slurp;
