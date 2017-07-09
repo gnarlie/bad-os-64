@@ -18,21 +18,23 @@ static void config_word(uint8_t slot, uint8_t o) {
 
 static void print_device(uint32_t vendev, uint8_t slot, uint8_t f) {
 
-    console_put_dec(slot); console_print_string("."); console_put_dec(f);
-    console_print_string(": " );
+    console_print_string("%d.%d: ", slot, f);
     console_put_hex16(vendev & 0xffff); console_print_string(":"); console_put_hex16(vendev >> 16);
 
     uint8_t hdr = readPciConfig(0, slot, f, 0xc) >> 16;
-    console_print_string(" " ); console_put_hex16(hdr); console_print_string(" " );
+    console_print_string(" " ); console_put_hex8(hdr); console_print_string(" " );
 
     uint32_t bar0 = readPciConfig(0, slot, f, 0x10);
-    console_print_string(" "); console_put_hex(bar0); console_print_string(" " );
+    console_put_hex(bar0); console_print_string(" " );
 
     uint32_t bar1 = readPciConfig(0, slot, f, 0x14);
-    console_print_string(" "); console_put_hex(bar1); console_print_string(" " );
+    console_put_hex(bar1); console_print_string(" " );
+
+    uint32_t statCmd = readPciConfig(0, slot, f, 0x4);
+    console_print_string("%x ", statCmd);
 
     uint8_t intr = readPciConfig(0, slot, f, 0x3c) ;
-    console_put_hex16(intr); console_print_string(" ");
+    if (intr) console_print_string(" int %d", intr);
 
     console_print_string("\n");
 }

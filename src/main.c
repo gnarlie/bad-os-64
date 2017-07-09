@@ -178,10 +178,56 @@ static void user_mode() {
     syscall(console_print_string, "hello from ring 3\n");
 }
 
+static void cpu_details() {
+    uint32_t eax, ebx, ecx, edx;
+    char brand[48];
+    bzero(brand, sizeof(brand));
+
+    asm volatile ("mov %4, %%eax\ncpuid":
+            "=a"(eax), "=b"(ebx), "=c"(ecx), "=d"(edx): "g"(0x80000002));
+    memcpy(brand, &eax, 4);
+    memcpy(brand+4, &ebx, 4);
+    memcpy(brand+8, &ecx, 4);
+    memcpy(brand+12, &edx, 4);
+
+    asm volatile ("mov %4, %%eax\ncpuid":
+            "=a"(eax), "=b"(ebx), "=c"(ecx), "=d"(edx): "g"(0x80000003));
+    memcpy(brand+16, &eax, 4);
+    memcpy(brand+20, &ebx, 4);
+    memcpy(brand+24, &ecx, 4);
+    memcpy(brand+28, &edx, 4);
+
+    asm volatile ("mov %4, %%eax\ncpuid":
+            "=a"(eax), "=b"(ebx), "=c"(ecx), "=d"(edx): "g"(0x80000004));
+    memcpy(brand+32, &eax, 4);
+    memcpy(brand+36, &ebx, 4);
+    memcpy(brand+40, &ecx, 4);
+    memcpy(brand+44, &edx, 4);
+
+    console_print_string("Running on a %s\n", brand);
+
+    asm volatile ("mov %4, %%eax\ncpuid":
+            "=a"(eax), "=b"(ebx), "=c"(ecx), "=d"(edx): "g"(1));
+    uint32_t family = (eax >> 8) & 0xf;
+    uint32_t model = (family == 6 || family == 0xf)
+        ? ((eax >> 12) & 0xf0) + ((eax >> 4) & 0xf)
+        : (eax >> 4) & 0xf ;
+    uint32_t display_family = family == 0xf
+        ?  ((eax >> 20) & 0xff) + family
+        : family;
+    console_print_string("eax %x, Model %d, family %d, stepping %d\n", eax, model, display_family, eax & 0xf);
+}
+
+extern void init_ata();
+
+#include "fs/vfs.h"
+
 void main() {
     console_set_color(Green, Black);
     console_print_string("BadOS-64\n");
     console_set_color(Gray, Black);
+
+    cpu_details();
 
     init_interrupts();
     init_gdt();
