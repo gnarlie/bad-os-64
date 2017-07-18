@@ -15,7 +15,8 @@
 #include "service/echo.h"
 #include "service/clock.h"
 
-void dump_regs(registers_t* regs) {
+
+static void dump_regs(registers_t* regs) {
     console_print_string("rax %p rbx %p\n", regs->rax, regs->rbx);
     console_print_string("rcx %p rdx %p\n", regs->rcx, regs->rdx);
     console_print_string("r8  %p r9  %p\n", regs->r8, regs->r9);
@@ -51,6 +52,10 @@ void dump_regs(registers_t* regs) {
             "=m"(cr0), "=m"(cr2), "=m"(cr3), "=m"(cr4)::"rax");
     console_print_string("cr0 %p cr2 %p\n", cr0, cr2);
     console_print_string("cr3 %p cr4 %p\n", cr3, cr4);
+}
+
+static void double_fault(registers_t* regs, void*user) {
+    panic("double fault!");
 }
 
 static void breakpoint(registers_t* regs, void*user) {
@@ -132,8 +137,6 @@ static void create_tss(struct gdt_entry* entry) {
  */
 
 static void init_gdt() {
-    extern void install_gdt(void*, uint16_t);
-    extern void install_tss();
 
     struct gdt_entry gdt[8];
     bzero(gdt, sizeof(gdt));
@@ -203,6 +206,7 @@ void main() {
     register_interrupt_handler(3, breakpoint, 0);
     register_interrupt_handler(0xd, protection, 0);
     register_interrupt_handler(0xe, protection, (void*)1);
+    register_interrupt_handler(8, double_fault, 0);
 
     init_ata();
 
@@ -213,10 +217,16 @@ void main() {
     char buf[256];
     bzero(buf, sizeof(buf));
     int r = read("MOD.TXT", buf, sizeof(buf));
-    if (r < 0)
+    if (r < 0) {
+        console_set_color(Black, Red);
         console_print_string("Cannot read mod.txt: %d\n", r);
-    else
+        console_set_color(Gray, Black);
+    }
+    else {
+        console_set_color(Bright|Blue, Black);
         console_print_string("MOTD: %s", buf);
+        console_set_color(Gray, Black);
+    }
 
     call_user_function(user_mode);
 }

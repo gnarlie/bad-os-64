@@ -27,15 +27,15 @@ void irq_handler(uint8_t intNo, registers_t * regs) {
         handler(regs, interrupt_handlers[intNo].user);
     }
     else {
-//        console_print_string("Stray IRQ ");
-//        console_put_hex8(intNo);
-//        console_print_string("\n");
+        console_print_string("Stray IRQ %d\n", intNo);
     }
 }
 
 extern void create_gate(int, void(*)());
 
 void init_interrupts() {
+    disable_interrupts();
+
     //tell the pic to enable more interupts (Pure64 just did cascade, keyboard, and RTC)
     outb(0x21, 0);
     outb(0xa1, 0);
@@ -81,6 +81,8 @@ void init_interrupts() {
     DO_ISR(18);
     DO_ISR(19);
 #undef DO_ISR
+
+    enable_interrupts();
 }
 
 void disable_interrupts() {asm("cli");}
