@@ -6,6 +6,10 @@ void panic(const char * why) {
     ASSERT(why, 0);
 }
 
+void call_user_function(void * fn) {
+    FAIL("Not implemented");
+}
+
 void disable_interrupts() {}
 void enable_interrupts() {}
 
