@@ -8,7 +8,6 @@ USE64
 [EXTERN console_print_string]
 [EXTERN task_poll_for_work]
 [EXTERN panic]
-[EXTERN dump_regs]
 
 [GLOBAL start]
 [GLOBAL create_gate]
@@ -26,7 +25,6 @@ start:
     mov rdi, hello_message
     call console_print_string
     call main
-    sti
     mov [lastStack], esp
 main_loop:
     mov eax, [lastStack]
@@ -43,20 +41,40 @@ stack_slam:
     mov esp, [lastStack]
     jmp main_loop
 
+%define segment(idx, dpl) ((idx << 3) + dpl)
+
+%define kernel_code segment(1,0)
+%define kernel_data segment(2,0)
+%define user_32_code segment(3,3)
+%define user_code segment(5,3)
+%define user_data segment(4,3)
+
 ; rdi - data to be copied
 ; esi - size of data in bytes
 install_gdt:
     mov ecx, esi
     dec esi
     mov word [gdtr64], si
-	mov rsi, rdi
-	mov rdi, 0x00001000		; GDT address
+    mov rsi, rdi
+    mov rdi, 0x00001000      ; GDT address
     mov [gdtr64+2], rdi     ; stor in GDTR
-	rep movsb			    ; copy to here
-	lgdt [gdtr64]
-    ret
+    rep movsb               ; copy to here
+    lgdt [gdtr64]
 
-%define segment(idx, dpl) ((idx << 3) + dpl)
+    mov ax, kernel_data
+    mov ss, ax
+    mov ds, ax
+    mov es, ax
+    mov fs, ax
+    mov gs, ax
+
+    ; nasty bit to reload CS
+    mov rax, reload_done
+    push kernel_code
+    push rax
+    o64 retf
+reload_done:
+    ret
 
 install_tss:
     mov ax, segment(6,0)
@@ -65,39 +83,51 @@ install_tss:
 
 ; rdi - user function to call
 call_user_function:
-    push continue_to_kernel
-
-    mov ax, segment(4, 3)
     ; switch data selectors to user mode selectors
+    mov ax, user_data
     mov ds, ax
     mov es, ax
     mov fs, ax
     mov gs, ax
 
     mov rax, rsp
-    push segment(4, 3) ; user stack
+
+    ; fake interrupt frame
+    push user_data
     push rax           ; stack
     pushf
-    push segment(5, 3) ; user code segment
-    push rdi
+
+    push user_code
+    push user_entry
     iretq
 
-; ring 3 thunk to get back to kernel space
-continue_to_kernel:
+user_entry:
+    call rdi
+
+    ; ring 3 thunk to get back to kernel space
     mov rdi, end_user_fn
     syscall
 
-; back in kernel space
+; back in kernel space for good
 end_user_fn:
-    ret
+
+    ; Unwind the stack to where we were before calling user space
+    pop rax     ; w/b next RIP if we were to return
+    pop rax     ; w/b next RIP if the sysret would happen
+    pop rax     ; w/b flags if sysret would happen
+
+    ret  ; next  RIP effectively returns from call_user_function
 
 ; *********************************************
 ; System call crappe
 
 init_syscall:
-    ; bits 16..31: sysret cs & ss
-    ; bits  0..15: syscall cs & ss
-    mov edx, (segment(3, 3) << 16) + segment(1, 0) ; 0x00200008
+    ; bits 16..31: sysret 32 bit cs
+    ;   cs64 is cs32 + 16
+    ;   ss is cs32 + 8
+    ; bits  0..15: syscall cs
+    ;   ss is cs + 8
+    mov edx, (user_32_code << 16) + kernel_code
     xor eax, eax
     mov ecx, 0xc0000081 ; STAR
     wrmsr
@@ -111,12 +141,18 @@ init_syscall:
     ret
 
 ; rdi - system call function
-; esi - number of parameters
+; rsi - only parameter
 syscall:
     syscall
     ret
 
 syscall_enter:
+    ; here be kernel mode again
+    mov ax, ss
+    mov ds, ax
+    mov es, ax
+    mov fs, ax
+    mov gs, ax
     push r11 ; store adjusted flags
     push rcx ; store next rip
              ; should switch stacks here as well
@@ -127,7 +163,15 @@ syscall_enter:
 
     pop rcx ; pop next ring 3 instruction
     pop r11 ; pop flags
-    sysretq
+
+    ; get ready for user again
+    mov ax, user_data
+    mov ds, ax
+    mov es, ax
+    mov fs, ax
+    mov gs, ax
+
+    o64 sysret ; sysretq
 
 ; ----------------------
 ; Create a call gate for an irq. Stores the IDT entry at ES:[EDI*16]. Assumes that the IDTR
@@ -135,7 +179,7 @@ syscall_enter:
 ;   rdi - gate number
 ;   rsi - function to call
 create_gate:
-	shl rdi, 4
+    shl rdi, 4
     mov rax, rsi
 
 ; IDT entry
@@ -147,17 +191,23 @@ create_gate:
 ;   4 bytes : high 32 bits
 ;   4 bytes : 0
 
-	stosw               ; store the low word (15..0)
-	add rdi, 3			; skip selector (2), reserved,
-    mov al,  0xee       ; flags: 3 bits DPL, 1 storage, 3 type
-	stosb
-	shr rax, 16         ; move mid word to ax & store
-	stosw
-	shr rax, 16         ; move high dword to ax & store
-	stosd
+    stosw               ; store the low word (15..0)
+    mov ax, kernel_code ; code selector
+    stosw
+    xor ax, ax          ; 0
+    stosb
+    mov al,  0x8e       ; flags: present: 1, DPL: 3, storage: 0, type: interrupt
+    stosb
+    shr rax, 16         ; move mid word to ax & store
+    stosw
+    shr rax, 16         ; move high dword to ax & store
+    stosd
+    xor rax, rax
+    stosd
     ret
 
 %macro PUSH_ALL 0
+
     push rbp
     push r15
     push r14
@@ -190,6 +240,8 @@ create_gate:
 
 %macro POP_ALL 0
     pop rcx
+    ; mov ss, ecx
+    pop rcx
     mov ds, ecx
     pop rcx
     mov es, ecx
@@ -197,8 +249,6 @@ create_gate:
     mov fs, ecx
     pop rcx
     mov gs, ecx
-    pop rcx
-    ; mov ss, ecx
 
     pop rdi
     pop rsi
@@ -215,6 +265,7 @@ create_gate:
     pop r14
     pop r15
     pop rbp
+
     add rsp, 8
 %endmacro
 

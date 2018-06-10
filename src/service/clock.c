@@ -35,7 +35,8 @@ static void timer_irq(registers_t* regs, void *update_task) {
 }
 
 static void user_task(void * fn) {
-    call_user_function(fn);
+    update_clock(0);
+    // call_user_function(fn);
 }
 
 void init_clock() {
@@ -43,5 +44,4 @@ void init_clock() {
     Task * update_task = task_alloc(user_task, update_clock);
     add_ref(update_task);
     register_interrupt_handler(IRQ0, timer_irq, update_task);
-
 }

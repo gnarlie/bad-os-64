@@ -5,6 +5,7 @@ void panic(const char* why) {
     console_set_color(Red, Black);
     console_print_string("PANIC: %s", why);
 
+    asm ("xchgw %bx, %bx");
     asm ("cli");
     asm ("hlt");
 }

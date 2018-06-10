@@ -66,7 +66,7 @@ typedef struct {
     storage_device * store;
 } __attribute__((packed)) fat_device;
 
-inline uint32_t lbaOfCluster(fat_device* self, uint32_t cluster) {
+uint32_t lbaOfCluster(fat_device* self, uint32_t cluster) {
     uint32_t fatSectors = self->bs.tableSize * self->bpb.noFats;
     uint32_t firstDataSector = self->bpb.reservedSectors + fatSectors;
     return firstDataSector + (cluster - 2) * self->bpb.sectorsPerCluster;

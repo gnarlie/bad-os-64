@@ -8,8 +8,6 @@ void register_interrupt_handler(uint8_t n, isr_t handler, void * user) {
     interrupt_handlers[n].user = user;
 }
 
-extern void dump_regs(registers_t* regs);
-
 void isr_handler(uint8_t n, registers_t * regs) {
     isr_t handler = interrupt_handlers[n].fn;
     if (handler) {
@@ -27,7 +25,38 @@ void irq_handler(uint8_t intNo, registers_t * regs) {
         handler(regs, interrupt_handlers[intNo].user);
     }
     else {
-        // console_print_string("Stray IRQ %d\n", intNo);
+    //  console_print_string("Stray IRQ %d\n", intNo);
+    }
+}
+
+void dump_idt() {
+    struct IdtDescr
+    {
+        uint16_t offset_1;
+        uint16_t selector;
+        uint8_t ist;
+        uint8_t type_attr;
+        uint16_t offset_2;
+        uint32_t offset_3;
+        uint32_t zero;
+    } __attribute__((packed));
+
+    struct {
+        uint16_t limit;
+        struct IdtDescr* ids;
+    } idtr;
+
+    __asm__ __volatile__ ("sidt %0": "=m"(idtr) );
+
+    console_print_string("IDTR: limit %d at %p\n", idtr.limit, idtr.ids);
+
+    for (int i = 0; i < 16; ++i) {
+        uint64_t p = (
+            ((uint64_t)idtr.ids[i].offset_1)) |
+            (((uint64_t)idtr.ids[i].offset_2) << 16) |
+            (((uint64_t)idtr.ids[i].offset_3) << 32);
+
+        console_print_string("%d fn: %p, sel %x type %x\n", i, p, idtr.ids[i].selector, idtr.ids[i].type_attr);
     }
 }
 

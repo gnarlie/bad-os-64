@@ -8,6 +8,6 @@ static int is_transmit_empty(int port) {
 void serial_put(int com, char c) {
     while (!is_transmit_empty(com)) ;
 
-    outb(com, c);
+      outb(com, c);
 }
 

@@ -1,5 +1,5 @@
 CFLAGS=-Os -nostdlib -nostdinc -fno-builtin -fno-stack-protector -std=gnu99  -MMD -MP -g -Werror -mno-red-zone -I src -fno-asynchronous-unwind-tables
-TEST_CFLAGS=-std=gnu99 -Werror -MMD -MP -I src -g
+TEST_CFLAGS=-std=gnu99 -Werror -MMD -MP -I src -g -fno-builtin
 
 DISPLAY_LIBRARY ?= sdl
 
@@ -19,7 +19,7 @@ test: bin/alltests
 
 bin/alltests: $(TEST_OBJS) $(filter-out out/entry.o out/panic.o out/main.o out/interrupt.o out/keyboard.o, $(OBJS))
 	-mkdir -p bin/
-	$(CC) -o $@ $^ $|
+	$(CC) -o $@ $^
 
 run_nonet: disk.img fat32.img
 	IMAGE=disk.img DISPLAY_LIBRARY=$(DISPLAY_LIBRARY) CYL=128 LD_PRELOAD=/usr/lib/x86_64-linux-gnu/libXpm.so.4 bochs -q -f etc/bochsrc_nn
@@ -40,14 +40,15 @@ out/test/%.o: test/%.c
 	$(CC) -c $(TEST_CFLAGS) -o $@ $<
 
 kernel.sys: $(OBJS) Pure64/pure64.sys
-	ld  -Map=kernel.sym -Tsrc/kernel.ld -o /tmp/kernel $(OBJS) 
-	cat Pure64/pure64.sys /tmp/kernel > kernel.sys
+	ld -Map=kernel.sym -Tsrc/kernel.ld -o /tmp/kernel.elf $(OBJS)
+	objcopy --change-start 0x100000 -O binary /tmp/kernel.elf /tmp/kernel.bin
+	cat Pure64/pure64.sys /tmp/kernel.bin > kernel.sys
 
 Pure64/bmfs_mbr.sys Pure64/pure64.sys:
 	cd Pure64 && ./build.sh
 
 disk.img: Pure64/bmfs_mbr.sys kernel.sys
-	./createimage.sh disk.img 1 Pure64/bmfs_mbr.sys kernel.sys
+	./createimage.sh disk.img 1 Pure64/bmfs_mbr kernel.sys
 
 fat32.img: image/*
 	rm -f $@

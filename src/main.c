@@ -15,6 +15,13 @@
 #include "service/echo.h"
 #include "service/clock.h"
 
+static void dump_stack(registers_t* regs) {
+    uint32_t * start = (uint32_t*)(regs + 1);
+    uint32_t * p = start;
+    for(; p < start + 16; p += 4) {
+        console_print_string("%p: %x %x %x %x\n", p, p[0], p[1], p[2], p[3]);
+    }
+}
 
 static void dump_regs(registers_t* regs) {
     console_print_string("rax %p rbx %p\n", regs->rax, regs->rbx);
@@ -61,14 +68,40 @@ static void double_fault(registers_t* regs, void*user) {
 static void breakpoint(registers_t* regs, void*user) {
     console_print_string("breakpoint!\n");
     dump_regs(regs);
+    dump_stack(regs);
 }
 
 static void protection(registers_t* regs, void*user) {
-    if (user)
-        console_print_string("gpf\n");
-    else
-        console_print_string("pf\n");
+    console_print_string("General protection fault\n");
     dump_regs(regs);
+    dump_stack(regs);
+    panic("cannot continue");
+}
+
+static void page_fault(registers_t* regs, void*user) {
+
+    enum PageFaultFlags {
+        p = 1,
+        wr = 2,
+        us = 4,
+        rsvd = 8,
+        id = 16
+    };
+
+    uint64_t cr2;
+    __asm__ __volatile__ ("movq %%cr2, %%rax\n\t movq %%rax, %0\n\t": "=m"(cr2) :: "rax" );
+
+    console_print_string("page fault at %x\n", cr2);
+    console_print_string("cause: %s %s %s (%x)\n",
+            regs->errorCode & p ? "protection" : "non-present page",
+            regs->errorCode & wr ? "write" : "read",
+            regs->errorCode & us ? "user" : "supervisor",
+            regs->errorCode
+            );
+
+    dump_regs(regs);
+    dump_stack(regs);
+
     panic("cannot continue");
 }
 
@@ -83,30 +116,41 @@ struct gdt_entry {
     uint8_t segLimit : 4;
     uint8_t available : 1;
     uint8_t l : 1;           // 64 bit segment
-    uint8_t db : 1;          // lots of crappe
-    uint8_t granularity : 1; // 0: bytes, 1 4KB
+    uint8_t db : 1;          // n.b. must be 0 in 64 bit
+    uint8_t granularity : 1; // 0: bytes, 1: 4KB
     uint8_t baseHigh;
 } __attribute__((packed));
 
 struct tss {
    uint32_t reserved0;
-   uint64_t rsp0;
-   uint64_t rsp1;
-   uint64_t rsp2;
-   uint64_t reserved1;
-   uint64_t ist1;
-   uint64_t ist2;
-   uint64_t ist3;
-   uint64_t ist4;
-   uint64_t ist5;
-   uint64_t ist6;
-   uint64_t ist7;
-   uint64_t reserved2;
+   uint32_t rsp0l;
+   uint32_t rsp0h;
+   uint32_t rsp1l;
+   uint32_t rsp1h;
+   uint32_t rsp2l;
+   uint32_t rsp2h;
+   uint32_t reserved[2];
+   uint32_t ist1l;
+   uint32_t ist1h;
+   uint32_t ist2l;
+   uint32_t ist2h;
+   uint32_t ist3l;
+   uint32_t ist3h;
+   uint32_t ist4l;
+   uint32_t ist4h;
+   uint32_t ist5l;
+   uint32_t ist5h;
+   uint32_t ist6l;
+   uint32_t ist6h;
+   uint32_t ist7l;
+   uint32_t ist7h;
+   uint32_t reserved2[2];
    uint16_t reserved3;
    uint16_t ioMapBaseAddr;
 };
 
 static struct tss tss;
+static char interrupt_stack[4096];
 
 static void create_tss(struct gdt_entry* entry) {
     bzero(&tss, sizeof(tss));
@@ -114,9 +158,13 @@ static void create_tss(struct gdt_entry* entry) {
     uint64_t base = (uint64_t)&tss;
     uint32_t limit = sizeof tss;
 
+    uint64_t stack = (uint64_t)(interrupt_stack + 4080);
+    tss.rsp0l = stack;
+    tss.rsp0h = stack >> 32;
+
     entry->lowLimit = limit - 1;
     entry->baseLow = base & 0xffff;
-    entry->baseMid = (base >> 8) & 0xff;
+    entry->baseMid = (base >> 16) & 0xff;
     entry->type = 9;
     entry->descType = 0;
     entry->privLvl = 3;
@@ -127,6 +175,7 @@ static void create_tss(struct gdt_entry* entry) {
     entry->db = 0;
     entry->granularity = 0;
     entry->baseHigh = (base >> 24) & 0xff;
+
 
     // TODO IST's
 }
@@ -144,17 +193,19 @@ static void init_gdt() {
     // gdt[0] is null selector ... leave 0's
 
     // gdt[1] is kernel code
-    gdt[1].granularity = 1;
-    gdt[1].l = 1;
-    gdt[1].present = 1;
-    gdt[1].descType = 1;
-    gdt[1].type = 0xA; // execute / read
+    gdt[1].granularity = 1; // limit in pages
+    gdt[1].l = 1;           // 64bit
+    gdt[1].present = 1;     // valid
+    gdt[1].descType = 1;    // must be 1
+    gdt[1].type = 0x8;      // execute / read
     gdt[1].lowLimit = 0xffff;
     gdt[1].segLimit = 0xf;
 
     // gdt[2] is kernel data
     gdt[2] = gdt[1];
-    gdt[2].type = 6;  // read / write
+    gdt[2].type = 2;        // read / write
+    gdt[2].l = 0;
+    gdt[2].db = 1;
 
     // gdt[3] is another null selector (s/b 32 bit code)
     gdt[3] = gdt[0];
@@ -163,11 +214,11 @@ static void init_gdt() {
     gdt[4] = gdt[2];
     gdt[4].privLvl = 3;
 
-    // gdt[5] is user code (64 bit)
+    // gdt[5] is user code
     gdt[5] = gdt[1];
     gdt[5].privLvl = 3;
 
-    // gdt[6/7] is the 64bit TSS descriptor
+    // gdt[6] is the TSS descriptor
     create_tss(&gdt[6]);
 
     install_gdt(gdt, sizeof(gdt));
@@ -220,17 +271,20 @@ static void cpu_details() {
 
 extern void init_ata();
 
-#include "fs/vfs.h"
-
-void main() {
+int main() {
     console_set_color(Green, Black);
     console_print_string("BadOS-64\n");
     console_set_color(Gray, Black);
 
     cpu_details();
 
-    init_interrupts();
+    register_interrupt_handler(3, breakpoint, 0);
+    register_interrupt_handler(0xe, page_fault, 0);
+    register_interrupt_handler(0xd, protection, 0);
+    register_interrupt_handler(8, double_fault, 0);
+
     init_gdt();
+    init_interrupts();
     init_syscall();
 
     kmem_init();
@@ -248,11 +302,6 @@ void main() {
     init_ne2k();
 
     init_keyboard();
-
-    register_interrupt_handler(3, breakpoint, 0);
-    register_interrupt_handler(0xd, protection, 0);
-    register_interrupt_handler(0xe, protection, (void*)1);
-    register_interrupt_handler(8, double_fault, 0);
 
     init_ata();
 
@@ -274,6 +323,9 @@ void main() {
         console_set_color(Gray, Black);
     }
 
-    call_user_function(user_mode);
+   call_user_function(user_mode);
+   console_print_string("Starting up main loop\n");
+
+   return 0;
 }
 
