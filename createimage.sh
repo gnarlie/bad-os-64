@@ -1,5 +1,7 @@
 #! /bin/bash
 
+set -e
+
 function die() {
     echo $* 1>&2
     exit 1

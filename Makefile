@@ -48,7 +48,7 @@ Pure64/bmfs_mbr.sys Pure64/pure64.sys:
 	cd Pure64 && ./build.sh
 
 disk.img: Pure64/bmfs_mbr.sys kernel.sys
-	./createimage.sh disk.img 1 Pure64/bmfs_mbr kernel.sys
+	./createimage.sh disk.img 1 Pure64/bmfs_mbr.sys kernel.sys
 
 fat32.img: image/*
 	rm -f $@
