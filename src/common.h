@@ -24,7 +24,7 @@ int strncmp(char const * a, const char * b, size_t n);
 void strrev(char * str, char * end);
 char * strnchr(char * s, int c, size_t n);
 
-void panic(const char * why);
+void panic(const char * why) __attribute__((noreturn));
 void warn(const char * what);
 
 #ifndef NULL

@@ -8,6 +8,8 @@ void panic(const char* why) {
     asm ("xchgw %bx, %bx");
     asm ("cli");
     asm ("hlt");
+
+    __builtin_unreachable();
 }
 
 void warn(const char * what) {

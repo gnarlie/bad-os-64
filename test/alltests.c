@@ -7,7 +7,7 @@ void panic(const char * why) {
 }
 
 void call_user_function(void * fn) {
-    // FAIL("Not implemented");
+    ASSERT("Not implemented", 0);
 }
 
 void disable_interrupts() {}

@@ -27,7 +27,7 @@ uint32_t kmem_current_objects() {
     return heap.currentObjects;
 }
 
-void kmem_add_block(uint64_t start, uint64_t size, size_t chunkSize) {
+void kmem_add_block(void* start, uint64_t size, size_t chunkSize) {
     Block * newb = (Block*) start;
     newb->next = heap.block;
     heap.block = newb;
@@ -45,6 +45,7 @@ void kmem_add_block(uint64_t start, uint64_t size, size_t chunkSize) {
 }
 
 void kmem_init() {
+    // TODO ... make sure the loader is honoring static initialization
     heap.block = 0;
     heap.sequence = 0;
     heap.currentObjects = 0;
@@ -71,16 +72,18 @@ static char * kmem_block_start(Block* block) {
     return align8((char*)(block + 1) + block->nChunks / sizeof(block->chunkMasks[0]));
 }
 
-extern int printf(const char *, ...);
 void* kmem_alloc(size_t size) {
     size += sizeof(AllocationHeader);
     for (Block * block = heap.block; block; block = block->next) {
-        uint32_t requiredChunks = size / block->chunkSize;
-        if (block->chunkSize * requiredChunks < size) requiredChunks ++;
 
         // FIXME .. this will never cross bitset boundry - so no allocation with
         // more than 32 chunks will *ever* work. We'll need test running end of
         // one chunk with the begging of the next
+        uint32_t requiredChunks = size / block->chunkSize;
+
+        if (block->chunkSize * requiredChunks < size) requiredChunks ++;
+
+        if (requiredChunks > 32) continue;
 
         for(uint32_t chunk = 0; chunk < block->nChunks; chunk++) {
             uint32_t mask = (1 << requiredChunks) - 1;
@@ -91,7 +94,6 @@ void* kmem_alloc(size_t size) {
 
                     size_t offset = block->chunkSize * (chunk * 8 * sizeof(block->chunkMasks[0]) + bit);
                     char *memory = kmem_block_start(block) + offset;
-                    //printf("alloc %ld %d %d %d %p\n", offset, block->chunkSize, chunk, bit, memory);
                     ((AllocationHeader*)memory)->chunks = requiredChunks;
                     ((AllocationHeader*)memory)->sequence = heap.sequence++;
                     heap.currentObjects ++;
@@ -103,7 +105,6 @@ void* kmem_alloc(size_t size) {
     }
 
     panic("out of memory");
-    return NULL; //todo teach gcc that panic is one-way
 }
 
 static void kmem_free_from_block(Block* block, AllocationHeader * header) {
