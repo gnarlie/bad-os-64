@@ -8,6 +8,7 @@
 #include "ne2k.h"
 #include "ata.h"
 #include "entry.h"
+#include "process.h"
 
 #include "fs/vfs.h"
 
@@ -105,86 +106,10 @@ static void page_fault(registers_t* regs, void*user) {
     panic("cannot continue");
 }
 
-struct gdt_entry {
-    uint16_t lowLimit;
-    uint16_t baseLow;
-    uint8_t baseMid;
-    uint8_t type : 4;        // segment type
-    uint8_t descType : 1;    // 0 system, 1 code/data
-    uint8_t privLvl : 2;
-    uint8_t present : 1;
-    uint8_t segLimit : 4;
-    uint8_t available : 1;
-    uint8_t l : 1;           // 64 bit segment
-    uint8_t db : 1;          // n.b. must be 0 in 64 bit
-    uint8_t granularity : 1; // 0: bytes, 1: 4KB
-    uint8_t baseHigh;
-} __attribute__((packed));
-
-struct tss {
-   uint32_t reserved0;
-   uint32_t rsp0l;
-   uint32_t rsp0h;
-   uint32_t rsp1l;
-   uint32_t rsp1h;
-   uint32_t rsp2l;
-   uint32_t rsp2h;
-   uint32_t reserved[2];
-   uint32_t ist1l;
-   uint32_t ist1h;
-   uint32_t ist2l;
-   uint32_t ist2h;
-   uint32_t ist3l;
-   uint32_t ist3h;
-   uint32_t ist4l;
-   uint32_t ist4h;
-   uint32_t ist5l;
-   uint32_t ist5h;
-   uint32_t ist6l;
-   uint32_t ist6h;
-   uint32_t ist7l;
-   uint32_t ist7h;
-   uint32_t reserved2[2];
-   uint16_t reserved3;
-   uint16_t ioMapBaseAddr;
-};
-
-static struct tss tss;
-static char interrupt_stack[4096];
-
-static void create_tss(struct gdt_entry* entry) {
-    bzero(&tss, sizeof(tss));
-
-    uint64_t base = (uint64_t)&tss;
-    uint32_t limit = sizeof tss;
-
-    uint64_t stack = (uint64_t)(interrupt_stack + 4080);
-    tss.rsp0l = stack;
-    tss.rsp0h = stack >> 32;
-
-    entry->lowLimit = limit - 1;
-    entry->baseLow = base & 0xffff;
-    entry->baseMid = (base >> 16) & 0xff;
-    entry->type = 9;
-    entry->descType = 0;
-    entry->privLvl = 3;
-    entry->present = 1;
-    entry->segLimit = 0;
-    entry->available = 0;
-    entry->l = 0;
-    entry->db = 0;
-    entry->granularity = 0;
-    entry->baseHigh = (base >> 24) & 0xff;
-
-
-    // TODO IST's
-}
-
 /****
  * Starting with the boot loader's GDT, which is good enough for kernel
  * operation - extend to allow user mode
  */
-
 static void init_gdt() {
 
     struct gdt_entry gdt[8];
@@ -269,6 +194,38 @@ static void cpu_details() {
     console_print_string("eax %x, Model %d, family %d, stepping %d\n", eax, model, display_family, eax & 0xf);
 }
 
+void parse_memory_map() {
+    struct E820 {
+        char * ptr;
+        uint64_t len;
+        uint32_t type; // 1: usable, 2: notusable
+        uint32_t ext;  //
+        uint64_t pad;  // ?  not in docs
+    };
+
+    struct E820 * table = (struct E820*) 0x4000;
+    kmem_add_block((char*)0x8000, 0x2000, 0x80);
+
+    // HeapStart gives us room from 0x100000 to 0x1fffff for kernel code
+    char * const HeapStart = (char*)0x200000;
+
+    while( table->ptr || table->len ) {
+        if (table->len && (table->type == 1)) {
+            if (table->ptr + table->len >= HeapStart) {
+                char * begin = table->ptr;
+                uint64_t len = table->len;
+                if (begin < HeapStart) {
+                    len -= (HeapStart - begin);
+                    begin = HeapStart;
+                }
+                console_print_string("Adding %p %x to available heap\n", begin, len);
+                kmem_add_block(begin, len, 0x400);
+            }
+        }
+        table++;
+    }
+}
+
 extern void init_ata();
 
 int main() {
@@ -287,16 +244,13 @@ int main() {
     init_interrupts();
     init_syscall();
 
-    kmem_init();
-
     uint32_t ram = *(uint32_t*)0x5020;
     uint16_t cpuSpeed = *(uint16_t*)0x5010;
     console_print_string("\nSystem RAM: %d MB. CPU Speed: %d MHz\n\n",
             ram, cpuSpeed);
 
-    // TODO need to make these less arbiratry, based on the
-    // actual memory map
-    kmem_add_block(0x200000, 1024*1024*1024, 0x400);
+    kmem_init();
+    parse_memory_map();
 
     init_pci();
     init_ne2k();
@@ -315,17 +269,17 @@ int main() {
     if (r < 0) {
         console_set_color(Black, Red);
         console_print_string("Cannot read mod.txt: %d\n", r);
-        console_set_color(Gray, Black);
     }
     else {
         console_set_color(Bright|Blue, Black);
         console_print_string("MOTD: %s", buf);
         console_set_color(Gray, Black);
     }
+    console_set_color(Gray, Black);
 
-   call_user_function(user_mode);
-   console_print_string("Starting up main loop\n");
+    create_process(user_mode);
+    console_print_string("Starting up main loop\n");
 
-   return 0;
+    return 0;
 }
 

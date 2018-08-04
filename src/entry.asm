@@ -25,9 +25,9 @@ start:
     mov rdi, hello_message
     call console_print_string
     call main
-    mov [lastStack], esp
+    mov [last_stack], esp
 main_loop:
-    mov eax, [lastStack]
+    mov eax, [last_stack]
     cmp eax, esp
     jne stack_slam
     call task_poll_for_work
@@ -38,7 +38,7 @@ main_loop:
 stack_slam:
     mov rdi, stack_differs
     call console_print_string
-    mov esp, [lastStack]
+    mov esp, [last_stack]
     jmp main_loop
 
 %define segment(idx, dpl) ((idx << 3) + dpl)
@@ -81,8 +81,10 @@ install_tss:
     ltr ax
     ret
 
-; rdi - user function to call
+; rdi - struct process_t
 call_user_function:
+    mov [current_task], rdi
+
     ; switch data selectors to user mode selectors
     mov ax, user_data
     mov ds, ax
@@ -90,33 +92,32 @@ call_user_function:
     mov fs, ax
     mov gs, ax
 
-    mov rax, rsp
-
     ; fake interrupt frame
+    mov rax, rsp
+    push rax
+    mov rax, [rdi + 8]
     push user_data
     push rax           ; stack
     pushf
 
     push user_code
-    push user_entry
+    push .user_entry
     iretq
 
-user_entry:
-    call rdi
+.user_entry:
+    ; now in user space ... call requested entry point
+    call [rdi]
 
     ; ring 3 thunk to get back to kernel space
-    mov rdi, end_user_fn
+    mov rdi, .end_user_fn
     syscall
 
 ; back in kernel space for good
-end_user_fn:
-
-    ; Unwind the stack to where we were before calling user space
-    pop rax     ; w/b next RIP if we were to return
-    pop rax     ; w/b next RIP if the sysret would happen
-    pop rax     ; w/b flags if sysret would happen
-
-    ret  ; next  RIP effectively returns from call_user_function
+.end_user_fn:
+    mov rsp, [last_stack]
+    mov rdi, [current_task]
+    call [rdi + 16]
+    jmp main_loop
 
 ; *********************************************
 ; System call crappe
@@ -153,6 +154,7 @@ syscall_enter:
     mov es, ax
     mov fs, ax
     mov gs, ax
+
     push r11 ; store adjusted flags
     push rcx ; store next rip
              ; should switch stacks here as well
@@ -171,11 +173,11 @@ syscall_enter:
     mov fs, ax
     mov gs, ax
 
-    o64 sysret ; sysretq
+    o64 sysret
 
 ; ----------------------
 ; Create a call gate for an irq. Stores the IDT entry at ES:[EDI*16]. Assumes that the IDTR
-; has been set to point to address 0. Pure64 has done this for us. TODO: setup our own dammnit!
+; has been set to point to address 0. Pure64 has done this for us.
 ;   rdi - gate number
 ;   rsi - function to call
 create_gate:
@@ -366,7 +368,8 @@ ISR 29
 ISR 30
 ISR 31
 
-lastStack     dq 0
+last_stack     dq 0
+current_task   dq 0
 stack_differs db `Stack pointer has changed\n`, 0
 hello_message db `Initializing BadOS-64\n`, 0
 pct_p         db `here: %p\n`, 0
